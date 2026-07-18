@@ -1,6 +1,7 @@
-// MoodScape asset generator — runs automatically after `npm install`.
+// Prism asset generator — runs automatically after `npm install`.
 // Paints the app icon, splash art and Android adaptive icon as PNGs in pure
-// Node (no dependencies), so a fresh clone runs in Expo Go with zero setup.
+// Node (no dependencies): a glass prism splitting a beam of light into the
+// spectrum. A fresh clone runs in Expo Go with zero downloads.
 
 const fs = require('fs');
 const path = require('path');
@@ -67,11 +68,12 @@ const hex = (s) => [
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const mix = (a, b, t) => a + (b - a) * t;
 
+const SPECTRUM = ['#22D3EE', '#818CF8', '#E879F9', '#FB7185', '#FBBF24'].map(hex);
+
 function makeCanvas(w, h) {
   return { w, h, data: Buffer.alloc(w * h * 4) };
 }
 
-// Source-over composite of color [r,g,b] with alpha a onto pixel i.
 function blend(canvas, x, y, rgb, a) {
   if (x < 0 || y < 0 || x >= canvas.w || y >= canvas.h || a <= 0) return;
   const i = (y * canvas.w + x) * 4;
@@ -102,75 +104,104 @@ function glow(canvas, cx, cy, r, rgb, alpha) {
     for (let x = x0; x <= x1; x++) {
       const d = Math.hypot(x - cx, y - cy) / r;
       if (d >= 1) continue;
-      const fall = (1 - d) ** 2;
-      blend(canvas, x, y, rgb, alpha * fall);
+      blend(canvas, x, y, rgb, alpha * (1 - d) ** 2);
     }
   }
 }
 
-// The MoodScape orb: gradient glass sphere, sheen, rim light and a face.
-function orb(canvas, cx, cy, r, topColor, bottomColor, { face = true } = {}) {
-  const x0 = Math.max(0, Math.floor(cx - r) - 2);
-  const x1 = Math.min(canvas.w - 1, Math.ceil(cx + r) + 2);
-  const y0 = Math.max(0, Math.floor(cy - r) - 2);
-  const y1 = Math.min(canvas.h - 1, Math.ceil(cy + r) + 2);
-  const hx = cx - r * 0.34; // sheen centre
-  const hy = cy - r * 0.42;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const dist = Math.hypot(x - cx, y - cy);
-      const cov = clamp01(r - dist + 0.5); // 1px anti-aliased edge
-      if (cov <= 0) continue;
-      const t = clamp01((y - (cy - r)) / (2 * r));
-      let rgb = [
-        mix(topColor[0], bottomColor[0], t),
-        mix(topColor[1], bottomColor[1], t),
-        mix(topColor[2], bottomColor[2], t),
+// soft white beam along segment p0→p1 with the given half-width
+function beam(canvas, p0, p1, halfWidth, rgb, alpha) {
+  const [x0, y0] = p0;
+  const [x1, y1] = p1;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len2 = dx * dx + dy * dy;
+  const minX = Math.max(0, Math.floor(Math.min(x0, x1) - halfWidth));
+  const maxX = Math.min(canvas.w - 1, Math.ceil(Math.max(x0, x1) + halfWidth));
+  const minY = Math.max(0, Math.floor(Math.min(y0, y1) - halfWidth));
+  const maxY = Math.min(canvas.h - 1, Math.ceil(Math.max(y0, y1) + halfWidth));
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const t = clamp01(((x - x0) * dx + (y - y0) * dy) / len2);
+      const px = x0 + t * dx;
+      const py = y0 + t * dy;
+      const dist = Math.hypot(x - px, y - py) / halfWidth;
+      if (dist >= 1) continue;
+      blend(canvas, x, y, rgb, alpha * (1 - dist) ** 2);
+    }
+  }
+}
+
+// rainbow fan spreading from (ex, ey) between angles a0 and a1
+function rainbow(canvas, ex, ey, a0, a1, reach, alpha) {
+  const bands = SPECTRUM.length;
+  const span = a1 - a0;
+  for (let y = 0; y < canvas.h; y++) {
+    for (let x = Math.max(0, Math.floor(ex)); x < canvas.w; x++) {
+      const dx = x - ex;
+      const dy = y - ey;
+      if (dx <= 0) continue;
+      const dist = Math.hypot(dx, dy);
+      if (dist > reach) continue;
+      const ang = Math.atan2(dy, dx);
+      const u = (ang - a0) / span;
+      if (u < 0 || u >= 1) continue;
+      const band = Math.min(bands - 1, Math.floor(u * bands));
+      // soften band borders and the fan's outer edges
+      const inBand = (u * bands) % 1;
+      const edge = Math.min(inBand, 1 - inBand) * 4;
+      const fade = (1 - dist / reach) * Math.min(1, edge + 0.35) * Math.min(1, dist / 60);
+      blend(canvas, x, y, SPECTRUM[band], alpha * fade);
+    }
+  }
+}
+
+// translucent glass triangle with bright edges and a top sheen
+function prism(canvas, apex, left, right) {
+  const [ax, ay] = apex;
+  const [bx, by] = left;
+  const [cx, cy] = right;
+  const minX = Math.max(0, Math.floor(Math.min(ax, bx, cx)) - 2);
+  const maxX = Math.min(canvas.w - 1, Math.ceil(Math.max(ax, bx, cx)) + 2);
+  const minY = Math.max(0, Math.floor(Math.min(ay, by, cy)) - 2);
+  const maxY = Math.min(canvas.h - 1, Math.ceil(Math.max(ay, by, cy)) + 2);
+
+  const edgeDist = (px, py, x0, y0, x1, y1) => {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const t = clamp01(((px - x0) * dx + (py - y0) * dy) / (dx * dx + dy * dy));
+    return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
+  };
+
+  const area = (x0, y0, x1, y1, x2, y2) => (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+  const total = area(ax, ay, bx, by, cx, cy);
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const w0 = area(bx, by, cx, cy, x, y) / total;
+      const w1 = area(cx, cy, ax, ay, x, y) / total;
+      const w2 = area(ax, ay, bx, by, x, y) / total;
+      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      const vertical = clamp01((y - ay) / (Math.max(by, cy) - ay));
+      // cool glass fill, brighter toward the apex
+      const fill = [
+        mix(235, 175, vertical),
+        mix(245, 195, vertical),
+        mix(255, 235, vertical),
       ];
-      // specular sheen (upper-left)
-      const hd = Math.hypot(x - hx, y - hy) / (r * 0.62);
-      if (hd < 1) {
-        const s = (1 - hd) ** 2 * 0.85;
-        rgb = rgb.map((v) => mix(v, 255, s));
+      blend(canvas, x, y, fill, 0.16 + (1 - vertical) * 0.10);
+      // bright refractive edges
+      const e = Math.min(
+        edgeDist(x, y, ax, ay, bx, by),
+        edgeDist(x, y, ax, ay, cx, cy),
+        edgeDist(x, y, bx, by, cx, cy),
+      );
+      if (e < 10) blend(canvas, x, y, [255, 255, 255], (1 - e / 10) ** 2 * 0.85);
+      // sheen streak under the left edge
+      const sheen = edgeDist(x, y, ax, ay, bx, by);
+      if (sheen > 14 && sheen < 44) {
+        blend(canvas, x, y, [255, 255, 255], (1 - Math.abs(sheen - 29) / 15) * 0.16);
       }
-      // rim light near the lower edge
-      const edge = dist / r;
-      if (edge > 0.82) {
-        const rim = ((edge - 0.82) / 0.18) ** 2 * (0.18 + 0.22 * t);
-        rgb = rgb.map((v) => mix(v, 255, rim));
-      }
-      blend(canvas, x, y, rgb, cov);
-    }
-  }
-  if (!face) return;
-  const ink = hex('#141830');
-  const eyeR = r * 0.075;
-  for (const s of [-1, 1]) {
-    glowSolid(canvas, cx + s * r * 0.30, cy - r * 0.05, eyeR, ink);
-  }
-  // smile: thick arc from the parametric curve
-  const mw = r * 0.62;
-  const my = cy + r * 0.30;
-  const lift = r * 0.16;
-  const thick = r * 0.055;
-  for (let i = 0; i <= 120; i++) {
-    const u = i / 120;
-    const px = cx - mw / 2 + mw * u;
-    const py = my + Math.sin(u * Math.PI) * lift;
-    glowSolid(canvas, px, py, thick, ink);
-  }
-}
-
-// filled anti-aliased dot
-function glowSolid(canvas, cx, cy, r, rgb) {
-  const x0 = Math.max(0, Math.floor(cx - r) - 1);
-  const x1 = Math.min(canvas.w - 1, Math.ceil(cx + r) + 1);
-  const y0 = Math.max(0, Math.floor(cy - r) - 1);
-  const y1 = Math.min(canvas.h - 1, Math.ceil(cy + r) + 1);
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const cov = clamp01(r - Math.hypot(x - cx, y - cy) + 0.5);
-      if (cov > 0) blend(canvas, x, y, rgb, cov * 0.86);
     }
   }
 }
@@ -181,20 +212,19 @@ function glowSolid(canvas, cx, cy, r, rgb) {
 const S = 1024;
 
 function paintScene(canvas, { background }) {
-  const c = canvas.w / 2;
   if (background) {
-    fillVertical(canvas, hex('#0A0F24'), hex('#1B2350'));
-    glow(canvas, c, c * 0.9, S * 0.62, hex('#6E8BFF'), 0.35);
-    glow(canvas, c * 1.5, c * 0.45, S * 0.30, hex('#A78BFA'), 0.30);
-    glow(canvas, c * 0.42, c * 1.55, S * 0.34, hex('#2BC8A5'), 0.22);
-  } else {
-    glow(canvas, c, c, S * 0.46, hex('#6E8BFF'), 0.5);
+    fillVertical(canvas, hex('#060812'), hex('#141B3C'));
+    glow(canvas, S * 0.72, S * 0.30, S * 0.55, hex('#8B5CF6'), 0.30);
+    glow(canvas, S * 0.25, S * 0.72, S * 0.5, hex('#22D3EE'), 0.22);
   }
-  // companion orbs
-  orb(canvas, c * 1.52, c * 0.52, S * 0.085, hex('#FFE08A'), hex('#FF9E64'), { face: false });
-  orb(canvas, c * 0.44, c * 1.50, S * 0.065, hex('#7CF29C'), hex('#2BC8A5'), { face: false });
-  // the hero
-  orb(canvas, c, c, S * 0.30, hex('#8AD8FF'), hex('#6E8BFF'));
+  const apex = [S * 0.485, S * 0.245];
+  const left = [S * 0.285, S * 0.685];
+  const right = [S * 0.685, S * 0.685];
+  const entry = [S * 0.40, S * 0.50];
+
+  beam(canvas, [0, S * 0.40], entry, S * 0.035, [255, 255, 255], 0.5);
+  rainbow(canvas, S * 0.52, S * 0.475, -0.28, 0.52, S * 0.58, 0.8);
+  prism(canvas, apex, left, right);
 }
 
 function save(name, canvas) {
@@ -202,19 +232,20 @@ function save(name, canvas) {
   console.log(`  painted assets/${name}`);
 }
 
-console.log('MoodScape: painting Liquid Glass assets…');
+console.log('Prism: painting Liquid Glass assets…');
 
 const icon = makeCanvas(S, S);
 paintScene(icon, { background: true });
 save('icon.png', icon);
 
 const splash = makeCanvas(S, S);
+glow(splash, S / 2, S / 2, S * 0.48, hex('#8B5CF6'), 0.35);
 paintScene(splash, { background: false });
 save('splash-icon.png', splash);
 
 const adaptive = makeCanvas(S, S);
-glow(adaptive, S / 2, S / 2, S * 0.34, hex('#6E8BFF'), 0.5);
-orb(adaptive, S / 2, S / 2, S * 0.24, hex('#8AD8FF'), hex('#6E8BFF'));
+glow(adaptive, S / 2, S / 2, S * 0.36, hex('#8B5CF6'), 0.4);
+prism(adaptive, [S * 0.5, S * 0.32], [S * 0.34, S * 0.66], [S * 0.66, S * 0.66]);
 save('adaptive-icon.png', adaptive);
 
-console.log('MoodScape: assets ready.');
+console.log('Prism: assets ready.');

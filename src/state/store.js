@@ -3,30 +3,37 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setHapticsEnabled } from '../utils/haptics';
-import { MOODS, MOOD_ORDER, TAGS } from '../theme/moods';
-import { dayKey } from '../utils/dates';
+import { dayKey, daysAgo, weekdayOf } from '../utils/dates';
+import { PRESETS } from '../theme/habitStyle';
 
-const ENTRIES_KEY = '@moodscape/entries.v2';
-const SETTINGS_KEY = '@moodscape/settings.v2';
+const HABITS_KEY = '@prism/habits.v1';
+const DONE_KEY = '@prism/completions.v1';
+const SETTINGS_KEY = '@prism/settings.v1';
 
 const DEFAULT_SETTINGS = { appearance: 'auto', haptics: true };
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const SettingsContext = createContext({ settings: DEFAULT_SETTINGS });
-const EntriesContext = createContext({ entries: [] });
+const HabitsContext = createContext({ habits: [], completions: {} });
+
+const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [entries, setEntries] = useState([]);
+  const [habits, setHabits] = useState([]);
+  const [completions, setCompletions] = useState({});
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [rawEntries, rawSettings] = await Promise.all([
-          AsyncStorage.getItem(ENTRIES_KEY),
+        const [rawHabits, rawDone, rawSettings] = await Promise.all([
+          AsyncStorage.getItem(HABITS_KEY),
+          AsyncStorage.getItem(DONE_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
         ]);
-        if (rawEntries) setEntries(JSON.parse(rawEntries));
+        if (rawHabits) setHabits(JSON.parse(rawHabits));
+        if (rawDone) setCompletions(JSON.parse(rawDone));
         if (rawSettings) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSettings) });
       } catch (e) {
         // A corrupt store should never brick the app — start fresh.
@@ -40,9 +47,14 @@ export function StoreProvider({ children }) {
     setHapticsEnabled(settings.haptics);
   }, [settings.haptics]);
 
-  const persistEntries = useCallback((next) => {
-    setEntries(next);
-    AsyncStorage.setItem(ENTRIES_KEY, JSON.stringify(next)).catch(() => {});
+  const persistHabits = useCallback((next) => {
+    setHabits(next);
+    AsyncStorage.setItem(HABITS_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+
+  const persistDone = useCallback((next) => {
+    setCompletions(next);
+    AsyncStorage.setItem(DONE_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
   const updateSettings = useCallback((patch) => {
@@ -53,82 +65,104 @@ export function StoreProvider({ children }) {
     });
   }, []);
 
-  const addEntry = useCallback(({ mood, note, tags }) => {
-    const now = new Date();
-    const entry = {
-      id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
-      mood,
-      note: (note || '').trim(),
-      tags: tags || [],
-      createdAt: now.getTime(),
-      day: dayKey(now),
+  const addHabit = useCallback(({ name, icon, color, days }) => {
+    const habit = {
+      id: newId(),
+      name: name.trim(),
+      icon,
+      color,
+      days: days && days.length ? [...days].sort() : ALL_DAYS,
+      createdAt: Date.now(),
     };
-    persistEntries([entry, ...entries]);
-    return entry;
-  }, [entries, persistEntries]);
+    persistHabits([...habits, habit]);
+    return habit;
+  }, [habits, persistHabits]);
 
-  const deleteEntry = useCallback((id) => {
-    persistEntries(entries.filter((e) => e.id !== id));
-  }, [entries, persistEntries]);
+  const updateHabit = useCallback((id, patch) => {
+    persistHabits(habits.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+  }, [habits, persistHabits]);
+
+  const deleteHabit = useCallback((id) => {
+    persistHabits(habits.filter((h) => h.id !== id));
+    const scrubbed = {};
+    for (const [day, map] of Object.entries(completions)) {
+      const { [id]: _gone, ...rest } = map;
+      if (Object.keys(rest).length) scrubbed[day] = rest;
+    }
+    persistDone(scrubbed);
+  }, [habits, completions, persistHabits, persistDone]);
+
+  const toggleCompletion = useCallback((habitId, key) => {
+    const dayMap = { ...(completions[key] || {}) };
+    let nowDone;
+    if (dayMap[habitId]) {
+      delete dayMap[habitId];
+      nowDone = false;
+    } else {
+      dayMap[habitId] = Date.now();
+      nowDone = true;
+    }
+    const next = { ...completions };
+    if (Object.keys(dayMap).length) next[key] = dayMap;
+    else delete next[key];
+    persistDone(next);
+    return nowDone;
+  }, [completions, persistDone]);
 
   const clearAll = useCallback(() => {
-    persistEntries([]);
-  }, [persistEntries]);
+    persistHabits([]);
+    persistDone({});
+  }, [persistHabits, persistDone]);
 
   const seedSample = useCallback(() => {
-    persistEntries(makeSampleEntries());
-  }, [persistEntries]);
+    const sample = PRESETS.slice(0, 4).map((preset, i) => ({
+      id: `sample-${i}-${newId()}`,
+      ...preset,
+      days: i === 3 ? [1, 2, 3, 4, 5] : ALL_DAYS,
+      createdAt: daysAgo(55).getTime(),
+    }));
+    const done = {};
+    const rates = [0.85, 0.7, 0.6, 0.75];
+    for (let back = 55; back >= 1; back--) {
+      const d = daysAgo(back);
+      const key = dayKey(d);
+      sample.forEach((h, i) => {
+        if (!h.days.includes(d.getDay())) return;
+        // habits get easier to keep as they settle in
+        const drift = Math.min(0.12, back / 460);
+        if (Math.random() < rates[i] - drift) {
+          if (!done[key]) done[key] = {};
+          done[key][h.id] = d.getTime();
+        }
+      });
+    }
+    persistHabits(sample);
+    persistDone(done);
+  }, [persistHabits, persistDone]);
 
   const settingsValue = useMemo(() => ({ settings, updateSettings }), [settings, updateSettings]);
-  const entriesValue = useMemo(
-    () => ({ entries, ready, addEntry, deleteEntry, clearAll, seedSample }),
-    [entries, ready, addEntry, deleteEntry, clearAll, seedSample],
-  );
+  const habitsValue = useMemo(() => ({
+    habits, completions, ready,
+    addHabit, updateHabit, deleteHabit, toggleCompletion, clearAll, seedSample,
+  }), [habits, completions, ready, addHabit, updateHabit, deleteHabit, toggleCompletion, clearAll, seedSample]);
 
   return (
     <SettingsContext.Provider value={settingsValue}>
-      <EntriesContext.Provider value={entriesValue}>
+      <HabitsContext.Provider value={habitsValue}>
         {children}
-      </EntriesContext.Provider>
+      </HabitsContext.Provider>
     </SettingsContext.Provider>
   );
 }
 
 export const useSettings = () => useContext(SettingsContext);
-export const useEntries = () => useContext(EntriesContext);
+export const useHabits = () => useContext(HabitsContext);
 
-// ---------------------------------------------------------------------------
-
-const SAMPLE_NOTES = {
-  radiant: ['Best day in ages — everything clicked.', 'Sunlit walk, good coffee, great news.'],
-  happy: ['Dinner with friends, laughed way too much.', 'Finished the thing. Finally!'],
-  calm: ['Quiet evening, tea and a book.', 'Long slow morning. Needed that.'],
-  meh: ['Fine, I guess. Autopilot day.', 'Nothing bad, nothing great.'],
-  low: ['Tired and a bit foggy all day.', 'Missed the gym, slept badly.'],
-  stormy: ['Rough one. Argument at work.', 'Everything felt heavy today.'],
-};
-
-function makeSampleEntries() {
-  const out = [];
-  let drift = 3.8;
-  for (let back = 44; back >= 0; back--) {
-    drift += (Math.random() - 0.47) * 1.4;
-    drift = Math.min(6, Math.max(1, drift));
-    if (Math.random() < 0.16 && back !== 0) continue; // the occasional missed day
-    const score = Math.round(Math.min(6, Math.max(1, drift + (Math.random() - 0.5))));
-    const mood = MOOD_ORDER.find((k) => MOODS[k].score === score) || 'calm';
-    const d = new Date();
-    d.setDate(d.getDate() - back);
-    d.setHours(9 + Math.floor(Math.random() * 11), Math.floor(Math.random() * 60), 0, 0);
-    const notes = SAMPLE_NOTES[mood];
-    out.push({
-      id: `sample-${back}-${Math.random().toString(36).slice(2, 8)}`,
-      mood,
-      note: Math.random() < 0.7 ? notes[Math.floor(Math.random() * notes.length)] : '',
-      tags: TAGS.filter(() => Math.random() < 0.14).slice(0, 3),
-      createdAt: d.getTime(),
-      day: dayKey(d),
-    });
-  }
-  return out.sort((a, b) => b.createdAt - a.createdAt);
+// A habit is "scheduled" on a given day if that weekday is in its list and
+// the day isn't before the habit existed.
+export function isScheduled(habit, key) {
+  if (!habit.days.includes(weekdayOf(key))) return false;
+  return key >= dayKey(habit.createdAt);
 }
+
+export const isDone = (completions, habitId, key) => !!completions[key]?.[habitId];

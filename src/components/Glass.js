@@ -5,15 +5,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle, useSharedValue, withSpring,
 } from 'react-native-reanimated';
-import { useTheme, type, radius as R } from '../theme/theme';
+import { useTheme, type, radius as R, SPECTRUM } from '../theme/theme';
 
 // ---------------------------------------------------------------------------
 // GlassSurface — the base Liquid Glass pane: real blur, a whisper of fill,
 // a hairline stroke, a bright specular top edge and a soft lifting shadow.
+// `spectrum` adds Prism's signature: a faint rainbow refraction along the top.
 // ---------------------------------------------------------------------------
 
 export function GlassSurface({
-  children, style, innerStyle, radius = R.card, strong = false, shadow = true,
+  children, style, innerStyle, radius = R.card, strong = false,
+  shadow = true, spectrum = false,
 }) {
   const t = useTheme();
   const g = t.glass;
@@ -23,8 +25,8 @@ export function GlassSurface({
         shadow && {
           shadowColor: g.shadow,
           shadowOpacity: g.shadowOpacity,
-          shadowRadius: 22,
-          shadowOffset: { width: 0, height: 12 },
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 },
           elevation: 8,
         },
         { borderRadius: radius },
@@ -43,9 +45,9 @@ export function GlassSurface({
         />
         <LinearGradient
           colors={[
-            t.scheme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.45)',
+            t.scheme === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.5)',
             'rgba(255,255,255,0.0)',
-            t.scheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.12)',
+            t.scheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.14)',
           ]}
           locations={[0, 0.55, 1]}
           style={StyleSheet.absoluteFill}
@@ -65,6 +67,18 @@ export function GlassSurface({
             height: 1, borderRadius: 1, backgroundColor: g.specular, opacity: 0.6,
           }}
         />
+        {spectrum && (
+          <LinearGradient
+            pointerEvents="none"
+            colors={SPECTRUM}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              position: 'absolute', top: 1, left: radius * 0.9, right: radius * 0.9,
+              height: 2, borderRadius: 2, opacity: t.scheme === 'dark' ? 0.55 : 0.75,
+            }}
+          />
+        )}
         <View style={innerStyle}>{children}</View>
       </View>
     </View>
@@ -77,7 +91,7 @@ export function GlassSurface({
 
 export function GlassPressable({
   children, onPress, onLongPress, style, innerStyle, radius = R.card,
-  strong, shadow = true, disabled, accessibilityLabel,
+  strong, shadow = true, spectrum, disabled, accessibilityLabel, accessibilityState,
 }) {
   const scale = useSharedValue(1);
   const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -88,11 +102,15 @@ export function GlassPressable({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPressIn={() => { scale.value = withSpring(0.965, { damping: 18, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
+      accessibilityState={accessibilityState}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 18, stiffness: 420 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }); }}
     >
       <Animated.View style={aStyle}>
-        <GlassSurface style={style} innerStyle={innerStyle} radius={radius} strong={strong} shadow={shadow}>
+        <GlassSurface
+          style={style} innerStyle={innerStyle} radius={radius}
+          strong={strong} shadow={shadow} spectrum={spectrum}
+        >
           {children}
         </GlassSurface>
       </Animated.View>
@@ -101,20 +119,21 @@ export function GlassPressable({
 }
 
 // ---------------------------------------------------------------------------
-// GlassButton — capsule action. `tint` (a [from,to] gradient) makes it a
-// prominent, colour-filled action; otherwise it is a quiet glass capsule.
+// GlassButton — capsule action. `tint` ([from, to]) makes it prominent.
 // ---------------------------------------------------------------------------
 
 export function GlassButton({ label, onPress, tint, style, textStyle, disabled, small }) {
   const t = useTheme();
   const scale = useSharedValue(1);
   const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const pad = small ? { paddingVertical: 10, paddingHorizontal: 18 } : { paddingVertical: 16, paddingHorizontal: 26 };
+  const pad = small
+    ? { paddingVertical: 10, paddingHorizontal: 18 }
+    : { paddingVertical: 16, paddingHorizontal: 26 };
   const inner = (
     <Text
       style={[
         small ? type.footnote : type.headline,
-        { color: tint ? '#0B0F1E' : t.text, textAlign: 'center' },
+        { color: tint ? '#080B18' : t.text, textAlign: 'center' },
         disabled && { opacity: 0.4 },
         textStyle,
       ]}
@@ -128,8 +147,8 @@ export function GlassButton({ label, onPress, tint, style, textStyle, disabled, 
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPressIn={() => { scale.value = withSpring(0.96, { damping: 18, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 18, stiffness: 420 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 320 }); }}
       style={style}
     >
       <Animated.View style={aStyle}>
@@ -137,7 +156,7 @@ export function GlassButton({ label, onPress, tint, style, textStyle, disabled, 
           <View
             style={{
               borderRadius: R.capsule,
-              shadowColor: tint[1], shadowOpacity: 0.55, shadowRadius: 18,
+              shadowColor: tint[1], shadowOpacity: 0.5, shadowRadius: 16,
               shadowOffset: { width: 0, height: 8 }, elevation: 8,
               opacity: disabled ? 0.5 : 1,
             }}
@@ -169,19 +188,24 @@ export function GlassButton({ label, onPress, tint, style, textStyle, disabled, 
 }
 
 // ---------------------------------------------------------------------------
-// Chip — a small glass toggle capsule (tags, filters).
+// Chip — a small glass toggle capsule.
 // ---------------------------------------------------------------------------
 
-export function Chip({ label, active, onPress, activeColor }) {
+export function Chip({ label, active, onPress, style }) {
   const t = useTheme();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!active }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      style={style}
+    >
       <View
         style={{
           borderRadius: R.capsule,
           paddingVertical: 8, paddingHorizontal: 14,
           backgroundColor: active
-            ? (activeColor || (t.scheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(20,28,60,0.10)'))
+            ? (t.scheme === 'dark' ? 'rgba(255,255,255,0.17)' : 'rgba(255,255,255,0.95)')
             : t.glass.fill,
           borderWidth: 1,
           borderColor: active ? t.glass.specular : t.glass.stroke,
@@ -224,27 +248,22 @@ export function Segmented({ options, value, onChange, style }) {
               {
                 position: 'absolute', top: 0, bottom: 0, width: segW,
                 borderRadius: R.capsule,
-                backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.9)',
+                backgroundColor: t.scheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.95)',
                 borderWidth: 1, borderColor: t.glass.specular,
-                shadowColor: t.glass.shadow, shadowOpacity: 0.2, shadowRadius: 6,
-                shadowOffset: { width: 0, height: 3 },
               },
             ]}
           />
         )}
         {options.map((o) => (
           <Pressable
-            key={o.value}
+            key={String(o.value)}
             onPress={() => onChange(o.value)}
             accessibilityRole="button"
             accessibilityState={{ selected: o.value === value }}
             style={{ flex: 1, paddingVertical: 9, alignItems: 'center' }}
           >
             <Text
-              style={[
-                type.footnote,
-                { color: o.value === value ? t.text : t.textSecondary },
-              ]}
+              style={[type.footnote, { color: o.value === value ? t.text : t.textSecondary }]}
             >
               {o.label}
             </Text>

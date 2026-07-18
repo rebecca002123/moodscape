@@ -5,16 +5,16 @@ import Animated, {
   useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AuroraBackground from './components/AuroraBackground';
+import Backdrop from './components/Backdrop';
 import TabBar from './components/TabBar';
+import HabitEditor from './components/HabitEditor';
 import TodayScreen from './screens/TodayScreen';
-import JournalScreen from './screens/JournalScreen';
-import InsightsScreen from './screens/InsightsScreen';
+import StatsScreen from './screens/StatsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { useTheme } from './theme/theme';
 
-// All four screens stay mounted; the active one fades and floats in.
-// Lighter than a navigation library and it keeps scroll positions alive.
+// All screens stay mounted; the active one fades and floats in. Lighter
+// than a navigation library, and scroll positions survive tab hops.
 function Pane({ active, children }) {
   const v = useSharedValue(active ? 1 : 0);
   useEffect(() => {
@@ -38,25 +38,34 @@ export default function AppShell() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('today');
-  const [accent, setAccent] = useState(null);
+  const [editor, setEditor] = useState({ open: false, habit: null });
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <StatusBar style={t.scheme === 'dark' ? 'light' : 'dark'} />
-      <AuroraBackground accent={tab === 'today' ? accent : null} />
+      <Backdrop />
       <Pane active={tab === 'today'}>
-        <TodayScreen topInset={insets.top} onAccent={setAccent} />
+        <TodayScreen
+          topInset={insets.top}
+          onEditHabit={(habit) => setEditor({ open: true, habit })}
+        />
       </Pane>
-      <Pane active={tab === 'journal'}>
-        <JournalScreen topInset={insets.top} />
-      </Pane>
-      <Pane active={tab === 'insights'}>
-        <InsightsScreen topInset={insets.top} />
+      <Pane active={tab === 'stats'}>
+        <StatsScreen topInset={insets.top} />
       </Pane>
       <Pane active={tab === 'settings'}>
         <SettingsScreen topInset={insets.top} />
       </Pane>
-      <TabBar active={tab} onChange={setTab} />
+      <TabBar
+        active={tab}
+        onChange={setTab}
+        onAdd={() => setEditor({ open: true, habit: null })}
+      />
+      <HabitEditor
+        visible={editor.open}
+        habit={editor.habit}
+        onClose={() => setEditor({ open: false, habit: null })}
+      />
     </View>
   );
 }

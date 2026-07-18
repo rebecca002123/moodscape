@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, ScrollView, Switch, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassSurface, GlassButton, Segmented, Txt } from '../components/Glass';
-import { useEntries, useSettings } from '../state/store';
+import { useHabits, useSettings } from '../state/store';
 import { useTheme } from '../theme/theme';
 import { tap, warn } from '../utils/haptics';
 
@@ -20,13 +20,13 @@ function Card({ title, children, delay = 0 }) {
 export default function SettingsScreen({ topInset }) {
   const t = useTheme();
   const { settings, updateSettings } = useSettings();
-  const { entries, clearAll, seedSample } = useEntries();
+  const { habits, clearAll, seedSample } = useHabits();
 
   const confirmClear = () => {
     warn();
     Alert.alert(
       'Erase everything?',
-      `This permanently deletes all ${entries.length} check-in${entries.length === 1 ? '' : 's'} from this device.`,
+      `This permanently deletes ${habits.length ? `all ${habits.length} habit${habits.length === 1 ? '' : 's'}` : 'your habits'} and their history from this device.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Erase', style: 'destructive', onPress: clearAll },
@@ -36,10 +36,10 @@ export default function SettingsScreen({ topInset }) {
 
   const confirmSample = () => {
     const run = () => { tap(); seedSample(); };
-    if (entries.length > 0) {
+    if (habits.length > 0) {
       Alert.alert(
-        'Replace your journal with sample data?',
-        'Your current check-ins will be overwritten by 6 weeks of demo entries.',
+        'Replace your habits with sample data?',
+        'Your current habits and history will be overwritten by eight weeks of demo data.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Replace', style: 'destructive', onPress: run },
@@ -59,7 +59,7 @@ export default function SettingsScreen({ topInset }) {
     >
       <View>
         <Txt v="largeTitle">Settings</Txt>
-        <Txt v="subhead" c="secondary">Make the glass yours</Txt>
+        <Txt v="subhead" c="secondary">Bend the light your way</Txt>
       </View>
 
       <Card title="Appearance">
@@ -86,7 +86,7 @@ export default function SettingsScreen({ topInset }) {
           <Switch
             value={settings.haptics}
             onValueChange={(v) => updateSettings({ haptics: v })}
-            trackColor={{ true: '#6E9BFF' }}
+            trackColor={{ true: '#818CF8' }}
           />
         </View>
       </Card>
@@ -98,7 +98,7 @@ export default function SettingsScreen({ topInset }) {
         <GlassButton small label="Fill with sample data" onPress={confirmSample} />
         <GlassButton
           small
-          label="Erase all check-ins"
+          label="Erase all habits"
           onPress={confirmClear}
           textStyle={{ color: t.danger }}
         />
@@ -106,9 +106,9 @@ export default function SettingsScreen({ topInset }) {
 
       <Card delay={180}>
         <View style={{ alignItems: 'center', gap: 4 }}>
-          <Txt v="headline">MoodScape</Txt>
-          <Txt v="footnote" c="tertiary">Liquid Glass edition · 2.0</Txt>
-          <Txt v="footnote" c="tertiary">Made with 💙 for Expo Go</Txt>
+          <Txt v="headline">Prism</Txt>
+          <Txt v="footnote" c="tertiary">Liquid Glass habits · 1.0</Txt>
+          <Txt v="footnote" c="tertiary">Small rituals, refracted daily</Txt>
         </View>
       </Card>
     </ScrollView>

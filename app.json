@@ -1,28 +1,28 @@
 {
   "expo": {
-    "name": "MoodScape",
-    "slug": "moodscape",
-    "version": "2.0.0",
+    "name": "Prism",
+    "slug": "prism",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "moodscape",
+    "scheme": "prism",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "backgroundColor": "#070b1a",
+    "backgroundColor": "#05070f",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#070b1a"
+      "backgroundColor": "#05070f"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.moodscape.app"
+      "bundleIdentifier": "com.prismhabits.app"
     },
     "android": {
-      "package": "com.moodscape.app",
+      "package": "com.prismhabits.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#070b1a"
+        "backgroundColor": "#05070f"
       }
     }
   }

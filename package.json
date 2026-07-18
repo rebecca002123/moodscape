@@ -1,7 +1,7 @@
 {
-  "name": "moodscape",
-  "version": "2.0.0",
-  "description": "MoodScape — a Liquid Glass mood journal. Check in, watch your inner weather, and see the patterns behind your days.",
+  "name": "prism",
+  "version": "1.0.0",
+  "description": "Prism — a Liquid Glass habit tracker. Small daily rituals, refracted into streaks, rings and light.",
   "main": "index.js",
   "scripts": {
     "start": "expo start",

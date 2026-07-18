@@ -5,31 +5,34 @@ export function dayKey(date) {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-export function daysAgoKey(n) {
+export function daysAgo(n) {
   const d = new Date();
+  d.setHours(12, 0, 0, 0);
   d.setDate(d.getDate() - n);
-  return dayKey(d);
+  return d;
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const todayKey = () => dayKey(new Date());
+
+export function dateFromKey(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
+export const weekdayOf = (key) => dateFromKey(key).getDay();
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-export function friendlyDay(key) {
-  if (key === daysAgoKey(0)) return 'Today';
-  if (key === daysAgoKey(1)) return 'Yesterday';
-  const [y, m, d] = key.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return `${WEEKDAYS[date.getDay()]}, ${MONTHS[date.getMonth()].slice(0, 3)} ${date.getDate()}`;
-}
+export const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+export const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function timeOf(ts) {
-  const d = new Date(ts);
-  const h = d.getHours();
-  const mins = `${d.getMinutes()}`.padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hr = h % 12 === 0 ? 12 : h % 12;
-  return `${hr}:${mins} ${ampm}`;
+export function friendlyKey(key) {
+  if (key === dayKey(daysAgo(0))) return 'Today';
+  if (key === dayKey(daysAgo(1))) return 'Yesterday';
+  const d = dateFromKey(key);
+  return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 }
 
 export function todayHeading() {

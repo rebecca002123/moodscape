@@ -1,167 +1,264 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { GlassPressable, GlassSurface, Txt } from '../components/Glass';
+import Icon from '../components/icons';
+import ProgressRing from '../components/ProgressRing';
+import { habitColor, PRESETS } from '../theme/habitStyle';
+import { isDone, isScheduled, useHabits } from '../state/store';
+import { useTheme, SPECTRUM } from '../theme/theme';
 import {
-  KeyboardAvoidingView, Platform, ScrollView, TextInput, View,
-} from 'react-native';
-import Animated, { FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
-import { GlassSurface, GlassButton, Chip, Txt } from '../components/Glass';
-import { HeroOrb, MoodOrb } from '../components/MoodOrb';
-import { MOODS, MOOD_ORDER, TAGS } from '../theme/moods';
-import { useEntries } from '../state/store';
-import { useTheme, type, radius as R } from '../theme/theme';
-import { greeting, todayHeading } from '../utils/dates';
-import { currentStreak } from '../utils/stats';
+  dayKey, daysAgo, friendlyKey, greeting, todayKey, WEEKDAY_LETTERS,
+} from '../utils/dates';
+import { currentStreak, dayProgress } from '../utils/stats';
 import { select, success, tap } from '../utils/haptics';
 
-export default function TodayScreen({ onAccent, topInset }) {
+function WeekStrip({ selected, onSelect }) {
   const t = useTheme();
-  const { entries, addEntry } = useEntries();
-  const [mood, setMood] = useState(null);
-  const [note, setNote] = useState('');
-  const [tags, setTags] = useState([]);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const flashTimer = useRef(null);
-
-  const streak = currentStreak(entries);
-
-  const pickMood = useCallback((key) => {
-    select();
-    setMood(key);
-    onAccent?.(MOODS[key].glow);
-  }, [onAccent]);
-
-  const toggleTag = useCallback((tag) => {
-    tap();
-    setTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]));
+  const { habits, completions } = useHabits();
+  const days = useMemo(() => {
+    const out = [];
+    for (let back = 6; back >= 0; back--) {
+      const d = daysAgo(back);
+      out.push({ key: dayKey(d), letter: WEEKDAY_LETTERS[d.getDay()], num: d.getDate() });
+    }
+    return out;
   }, []);
 
-  const save = useCallback(() => {
-    if (!mood) return;
-    addEntry({ mood, note, tags });
-    success();
-    setMood(null);
-    setNote('');
-    setTags([]);
-    onAccent?.(null);
-    setSavedFlash(true);
-    clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setSavedFlash(false), 2200);
-  }, [mood, note, tags, addEntry, onAccent]);
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {days.map((d) => {
+        const active = d.key === selected;
+        const progress = dayProgress(habits, completions, d.key);
+        return (
+          <Pressable
+            key={d.key}
+            onPress={() => { select(); onSelect(d.key); }}
+            accessibilityRole="button"
+            accessibilityLabel={friendlyKey(d.key)}
+            accessibilityState={{ selected: active }}
+            style={{ flex: 1 }}
+          >
+            <GlassSurface
+              radius={18}
+              shadow={false}
+              strong={active}
+              innerStyle={{ alignItems: 'center', paddingVertical: 10, gap: 6 }}
+              style={active ? {
+                borderRadius: 18,
+                shadowColor: '#818CF8', shadowOpacity: 0.5, shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 }, elevation: 6,
+              } : null}
+            >
+              <Txt v="caption" c={active ? undefined : 'tertiary'}>{d.letter}</Txt>
+              <ProgressRing
+                progress={progress ?? 0}
+                size={30}
+                stroke={3.5}
+                gradientId={`week-${d.key}`}
+              >
+                <Txt v="caption" c={active ? undefined : 'secondary'}>{d.num}</Txt>
+              </ProgressRing>
+            </GlassSurface>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function HabitRow({ habit, dayKey: key, index, onEdit }) {
+  const t = useTheme();
+  const { completions, toggleCompletion } = useHabits();
+  const done = isDone(completions, habit.id, key);
+  const streak = currentStreak(habit, completions);
+  const c = habitColor(habit.color);
+
+  const toggle = () => {
+    const nowDone = toggleCompletion(habit.id, key);
+    if (nowDone) success();
+    else tap();
+  };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: topInset + 18, paddingHorizontal: 20, paddingBottom: 150, gap: 18,
-        }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <Animated.View entering={FadeInDown.duration(380).delay(Math.min(index, 8) * 45)}>
+      <GlassPressable
+        onPress={toggle}
+        onLongPress={onEdit}
+        accessibilityLabel={`${habit.name}${done ? ', completed' : ', not completed yet'}. Tap to toggle, long press to edit.`}
+        accessibilityState={{ checked: done }}
+        innerStyle={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}
       >
-        <Animated.View entering={FadeInDown.duration(500)}>
-          <Txt v="footnote" c="secondary" style={{ textTransform: 'uppercase', letterSpacing: 1.2 }}>
-            {todayHeading()}
-          </Txt>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Txt v="largeTitle">{greeting()}</Txt>
-            {streak > 0 && (
-              <GlassSurface radius={R.capsule} shadow={false} innerStyle={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-                <Txt v="footnote">🔥 {streak} day{streak === 1 ? '' : 's'}</Txt>
-              </GlassSurface>
-            )}
-          </View>
-        </Animated.View>
+        <LinearGradient
+          colors={c.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            width: 46, height: 46, borderRadius: 15,
+            alignItems: 'center', justifyContent: 'center',
+            opacity: done ? 1 : 0.5,
+          }}
+        >
+          <Icon name={habit.icon} color="#080B18" size={24} />
+        </LinearGradient>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(70)}>
-          <GlassSurface innerStyle={{ padding: 20, alignItems: 'center', gap: 16 }}>
-            <Txt v="title3">How are you feeling?</Txt>
-            <View style={{ height: 158, alignItems: 'center', justifyContent: 'center' }}>
-              {mood ? (
-                <View style={{ alignItems: 'center', gap: 10 }}>
-                  <HeroOrb mood={mood} size={124} />
-                  <Txt v="headline" c={MOODS[mood].glow}>{MOODS[mood].label}</Txt>
-                </View>
-              ) : (
-                <View
-                  style={{
-                    width: 124, height: 124, borderRadius: 62,
-                    borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.glass.stroke,
-                    alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Txt v="subhead" c="tertiary" style={{ textAlign: 'center', paddingHorizontal: 12 }}>
-                    pick an orb below
-                  </Txt>
-                </View>
-              )}
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch', paddingHorizontal: 2 }}>
-              {MOOD_ORDER.map((key) => (
-                <View key={key} style={{ alignItems: 'center', gap: 6 }}>
-                  <MoodOrb mood={key} size={44} selected={mood === key} onPress={() => pickMood(key)} />
-                  <Txt v="caption" c={mood === key ? undefined : 'tertiary'}>{MOODS[key].label}</Txt>
-                </View>
-              ))}
-            </View>
-          </GlassSurface>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(500).delay(140)}>
-          <GlassSurface innerStyle={{ padding: 18, gap: 6 }}>
-            <Txt v="footnote" c="secondary">NOTE</Txt>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="What made you feel this way?"
-              placeholderTextColor={t.textTertiary}
-              multiline
-              maxLength={500}
-              style={[
-                type.body,
-                {
-                  color: t.text, minHeight: 74, textAlignVertical: 'top',
-                  backgroundColor: t.input, borderRadius: R.control,
-                  paddingHorizontal: 14, paddingVertical: 10,
-                },
-              ]}
-              accessibilityLabel="Journal note"
-            />
-          </GlassSurface>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(500).delay(210)}>
-          <GlassSurface innerStyle={{ padding: 18, gap: 12 }}>
-            <Txt v="footnote" c="secondary">WHAT'S IT ABOUT?</Txt>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {TAGS.map((tag) => (
-                <Chip key={tag} label={tag} active={tags.includes(tag)} onPress={() => toggleTag(tag)} />
-              ))}
-            </View>
-          </GlassSurface>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(500).delay(280)}>
-          <GlassButton
-            label={mood ? `Save ${MOODS[mood].label.toLowerCase()} check-in` : 'Pick a mood to check in'}
-            tint={mood ? MOODS[mood].gradient : undefined}
-            disabled={!mood}
-            onPress={save}
-          />
-        </Animated.View>
-
-        {savedFlash && (
-          <Animated.View
-            entering={FadeInUp.duration(300)}
-            exiting={FadeOut.duration(300)}
-            style={{ alignItems: 'center' }}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt
+            v="headline"
+            style={done ? null : { opacity: 0.85 }}
           >
-            <GlassSurface radius={R.capsule} innerStyle={{ paddingVertical: 10, paddingHorizontal: 18 }}>
-              <Txt v="footnote">Added to your journal ✨</Txt>
-            </GlassSurface>
-          </Animated.View>
+            {habit.name}
+          </Txt>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Icon name="flame" color={streak > 0 ? c.glow : t.textTertiary} size={13} />
+            <Txt v="footnote" c={streak > 0 ? 'secondary' : 'tertiary'}>
+              {streak > 0 ? `${streak} day streak` : 'no streak yet'}
+            </Txt>
+          </View>
+        </View>
+
+        {done ? (
+          <LinearGradient
+            colors={c.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: 34, height: 34, borderRadius: 17,
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: c.glow, shadowOpacity: 0.7, shadowRadius: 9,
+              shadowOffset: { width: 0, height: 3 }, elevation: 6,
+            }}
+          >
+            <Icon name="check" color="#080B18" size={19} />
+          </LinearGradient>
+        ) : (
+          <View
+            style={{
+              width: 34, height: 34, borderRadius: 17,
+              borderWidth: 2, borderColor: t.ringTrack,
+            }}
+          />
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </GlassPressable>
+    </Animated.View>
+  );
+}
+
+export default function TodayScreen({ topInset, onEditHabit }) {
+  const t = useTheme();
+  const { habits, completions, addHabit } = useHabits();
+  const [selected, setSelected] = useState(todayKey());
+
+  const scheduled = useMemo(
+    () => habits.filter((h) => isScheduled(h, selected)),
+    [habits, selected],
+  );
+  const doneCount = scheduled.filter((h) => isDone(completions, h.id, selected)).length;
+  const progress = scheduled.length ? doneCount / scheduled.length : null;
+  const viewingToday = selected === todayKey();
+
+  const heroLine = progress === null
+    ? 'Nothing scheduled — a true rest day.'
+    : progress === 1
+      ? 'Perfect day. All light, no gaps. ✨'
+      : progress === 0
+        ? (viewingToday ? 'A clean pane. Tap a habit to begin.' : 'This day went unlogged.')
+        : `${scheduled.length - doneCount} to go — keep the light moving.`;
+
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        paddingTop: topInset + 18, paddingHorizontal: 20, paddingBottom: 150, gap: 16,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <Animated.View entering={FadeInDown.duration(500)}>
+        <Txt v="footnote" c="secondary" style={{ textTransform: 'uppercase', letterSpacing: 1.2 }}>
+          {friendlyKey(selected)}
+        </Txt>
+        <Txt v="largeTitle">{viewingToday ? greeting() : 'Time travel'}</Txt>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.duration(500).delay(60)}>
+        <GlassSurface spectrum innerStyle={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+          <ProgressRing
+            progress={progress ?? 0}
+            size={86}
+            stroke={9}
+            colors={[SPECTRUM[0], SPECTRUM[1]]}
+            gradientId="hero"
+          >
+            <Txt v="title3">
+              {scheduled.length ? `${doneCount}/${scheduled.length}` : '—'}
+            </Txt>
+          </ProgressRing>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Txt v="headline">
+              {progress === 1 ? 'All done' : viewingToday ? 'Today’s light' : 'That day'}
+            </Txt>
+            <Txt v="subhead" c="secondary">{heroLine}</Txt>
+          </View>
+        </GlassSurface>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.duration(500).delay(120)}>
+        <WeekStrip selected={selected} onSelect={setSelected} />
+      </Animated.View>
+
+      <View style={{ gap: 12 }}>
+        {scheduled.map((habit, i) => (
+          <HabitRow
+            key={habit.id}
+            habit={habit}
+            dayKey={selected}
+            index={i}
+            onEdit={() => onEditHabit(habit)}
+          />
+        ))}
+      </View>
+
+      {habits.length === 0 && (
+        <Animated.View entering={FadeInDown.duration(500).delay(180)}>
+          <GlassSurface innerStyle={{ padding: 24, gap: 14 }}>
+            <Txt v="title3">Start with one ritual</Txt>
+            <Txt v="subhead" c="secondary">
+              Pick a starter below, or press the spectrum + to invent your own.
+            </Txt>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {PRESETS.map((preset) => (
+                <Pressable
+                  key={preset.name}
+                  onPress={() => { success(); addHabit(preset); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${preset.name}`}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 7,
+                      borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14,
+                      backgroundColor: t.glass.fillStrong,
+                      borderWidth: 1, borderColor: t.glass.stroke,
+                    }}
+                  >
+                    <Icon name={preset.icon} color={habitColor(preset.color).glow} size={17} />
+                    <Txt v="footnote">{preset.name}</Txt>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          </GlassSurface>
+        </Animated.View>
+      )}
+
+      {habits.length > 0 && scheduled.length === 0 && (
+        <GlassSurface innerStyle={{ padding: 22, alignItems: 'center', gap: 6 }}>
+          <Txt v="title3">Rest day</Txt>
+          <Txt v="subhead" c="secondary" style={{ textAlign: 'center' }}>
+            None of your habits repeat on this day.
+          </Txt>
+        </GlassSurface>
+      )}
+    </ScrollView>
   );
 }
