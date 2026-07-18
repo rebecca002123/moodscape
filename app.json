@@ -43,7 +43,8 @@
         {
           "microphonePermission": "Record voice memories that become glowing crystals."
         }
-      ]
+      ],
+      "expo-status-bar"
     ]
   }
 }
