@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "MoodScape",
+    "slug": "moodscape",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "moodscape",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "backgroundColor": "#0b1026",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1026"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.moodscape.app"
+    },
+    "android": {
+      "package": "com.moodscape.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1026"
+      }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MoodScape uses your location only to match the sky to your local weather."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Add a photo so a memory can become a portal on your island."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Record voice memories that become glowing crystals."
+        }
+      ]
+    ]
+  }
+}
