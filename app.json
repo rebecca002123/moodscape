@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Ember",
+    "slug": "ember",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "ember",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#0a0d18",
+    "splash": {
+      "backgroundColor": "#0a0d18"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ember.hearth"
+    },
+    "android": {
+      "package": "com.ember.hearth"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
