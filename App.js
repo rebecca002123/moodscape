@@ -1,20 +1,17 @@
-import 'react-native-gesture-handler';
 import React from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { MemoryProvider } from './src/state/MemoryStore';
-import WorldScreen from './src/screens/WorldScreen';
+import { StoreProvider } from './src/state/store';
+import { ThemeProvider } from './src/theme/theme';
+import AppShell from './src/AppShell';
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <MemoryProvider>
-          <StatusBar hidden />
-          <WorldScreen />
-        </MemoryProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <StoreProvider>
+        <ThemeProvider>
+          <AppShell />
+        </ThemeProvider>
+      </StoreProvider>
+    </SafeAreaProvider>
   );
 }

@@ -1,89 +1,84 @@
-# MoodScape 🌌
+# MoodScape 💙
 
-**A living emotion world.** Every feeling you plant becomes a floating glass island
-in an endless sky — and the world keeps growing with you.
+**A Liquid Glass mood journal.** Check in with a ten-second tap, watch your inner
+weather move across real glass, and let the patterns behind your days surface.
 
-Built with **Expo SDK 54** — runs entirely inside **Expo Go**. No accounts, no cloud:
-your whole sky lives on your device.
+Designed in the spirit of Apple's **Liquid Glass** language: real blur panes with
+specular top edges, floating capsule controls, a slow aurora drifting beneath every
+surface, and springy, haptic touches everywhere.
+
+Runs entirely inside **Expo Go** — no accounts, no cloud, no build step.
+Your journal never leaves your phone.
 
 ---
 
 ## Run it
 
-You need: [Node.js](https://nodejs.org) and the **Expo Go** app on your phone
-(iOS / Android — make sure it's up to date, SDK 54).
+You need [Node.js](https://nodejs.org) and the **Expo Go** app on your phone
+(iOS or Android — keep it up to date).
 
 ```bash
 git clone https://github.com/rebecca002123/moodscape.git
 cd moodscape
-npm install        # also paints the app icon + synthesizes the ambient audio (postinstall)
+npm install        # also paints the app icon + splash (postinstall, pure Node)
 npx expo start
 ```
 
-Then scan the QR code with **Expo Go** and step into your sky. 🌱
+Scan the QR code with Expo Go and you're in.
 
-> If your PC and phone are on different networks, use `npx expo start --tunnel`.
+> Phone and computer on different networks? Use `npx expo start --tunnel`.
 
 ---
 
 ## What's inside
 
-- **A living sky** — sunrise, bright afternoons, golden hour, starlit nights with aurora.
-  The world follows your clock, and **real weather** (Open-Meteo, no key) bends the light:
-  rain, snow, fog and storms fall across everything.
-- **Procedural glass islands** — every memory grows a unique island seeded by its own id.
-  Mood decides the landscape: happy blooms with crystal trees and butterflies, excited
-  pours waterfalls, peaceful holds a misty lake, sad brings gentle rain, anxious drifts
-  in fragments, inspired raises auroras and crystal towers. Season, hour, weather and the
-  **tone of your words** all leave marks.
-- **Planting a memory** — tap **＋**: a glass seed wakes and grows as you add a mood,
-  journal, tags, weather, a photo portal and a voice crystal. Then it blooms. 🌱
-- **Time travel** — pinch out to rise above the world; recent islands glow at the centre,
-  older ones drift outward. Double-tap to come home.
-- **Lumi, your companion** — a small orb of light with on-device insights: streaks,
-  weekly moods, recurring threads, and gentle flights back to old memories.
-- **World evolution** — 5 islands wake distant mountains, 10 summon fireflies,
-  25 raise a floating city… the sky keeps secrets up to 1000.
-- **Sound** — an ambient soundscape loop and a soft glass chime when an island blooms
-  (toggle in Lumi's panel).
-- **Accessibility** — honours system Reduce Motion, VoiceOver labels throughout.
+- **Today** — pick one of six liquid glass mood orbs (each with its own little
+  face), and the whole sky washes with that mood's glow. Add a note and context
+  tags, then save with a mood-tinted capsule button. Streak chip keeps you honest.
+- **Journal** — your history in glass cards, grouped by day. Long-press any
+  check-in to delete it.
+- **Insights** — streaks, check-in counts and your "typical" mood; a smooth
+  mood curve over 7 or 30 days; a five-week heatmap of tinted glass tiles;
+  your mood mix; and the tags that shape your days.
+- **Settings** — Auto/Light/Dark glass, haptics toggle, sample-data fill for a
+  quick tour, and one-tap erase.
 
-Everything is **on-device**: journal sentiment is read locally, memories are stored in
-AsyncStorage, and nothing ever leaves your phone. 🔒
+### The Liquid Glass system
 
-## Assets
+Every surface is built from one material recipe (`src/components/Glass.js`):
+a real `expo-blur` pane, a whisper of fill, a hairline stroke, a bright specular
+top edge and a soft lifting shadow. Segmented controls and the floating tab bar
+share a sliding "liquid pill". Beneath it all, `AuroraBackground` drifts four
+soft radial blobs so the glass always has something to refract — and it honours
+system **Reduce Motion**.
 
-`npm install` runs `scripts/setup-assets.js`, which paints the icon/splash PNGs and
-synthesizes `ambient.wav` / `chime.wav` in pure Node — no downloads, no dependencies.
-If you have the full **MoodScape.zip** (with the AI-painted icon and studio audio),
-just drop its `assets/` folder over the generated one — same filenames.
+- Adaptive **light & dark** themes, SF-flavoured type scale
+- **Haptics** on every meaningful touch (toggleable)
+- **On-device only**: AsyncStorage persistence, zero network calls
+- VoiceOver labels throughout
 
 ## Project structure
 
 ```
-App.js                    entry
+App.js                        providers + root
 src/
-  screens/WorldScreen.js  the endless sky, camera gestures, HUD
+  AppShell.js                 aurora + panes + floating tab bar
+  theme/theme.js              Liquid Glass material tokens, type scale
+  theme/moods.js              the six moods: gradients, glows, scores
   components/
-    Sky.js                crossfading time-of-day gradients, sun/moon, stars, aurora
-    Clouds.js             drifting glass clouds (parallax)
-    Particles.js          light motes & fireflies
-    WeatherOverlay.js     rain / snow / fog / lightning
-    Island.js             procedural SVG glass island + animated overlays
-    SeedComposer.js       the memory-planting flow
-    IslandDetail.js       opening a memory
-    CompanionOrb.js       Lumi + insights, milestones, settings
-    GlassPanel.js         liquid-glass primitives
-  state/MemoryStore.js    on-device persistence (AsyncStorage)
-  utils/                  seeded rng, palettes, moods, island generator, sentiment
-  services/               weather (Open-Meteo), insights
-scripts/setup-assets.js   procedural icon + audio generator (postinstall)
+    Glass.js                  GlassSurface / buttons / chips / segmented
+    AuroraBackground.js       drifting radial glow field
+    MoodOrb.js                glass spheres with faces (picker + hero)
+    TabBar.js                 floating capsule tab bar, SVG icons
+    charts.js                 mood curve, 5-week heatmap, mood mix bars
+  screens/                    Today, Journal, Insights, Settings
+  state/store.js              entries + settings (AsyncStorage)
+  utils/                      dates, stats, haptics
+scripts/setup-assets.js       paints icon/splash PNGs in pure Node (postinstall)
 ```
 
 ## Ideas for the future
 
-The design leaves room for Supabase sync, Apple/Google sign-in, Spotify forests,
-widgets, and LLM-written yearly reflections — the current build is fully offline
-so it runs in Expo Go with zero setup.
-
-Made with Kimi. 💜
+Reminders via local notifications, widgets, iCloud/Supabase sync, exporting a
+year-in-review — the current build stays fully offline so it runs in Expo Go
+with zero setup.

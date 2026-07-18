@@ -1,8 +1,6 @@
 // MoodScape asset generator — runs automatically after `npm install`.
-// Pure Node (no dependencies): paints the app icon + splash art as PNGs and
-// synthesizes the ambient soundscape + glass chime as WAVs, so a fresh clone
-// runs standalone. If you have the MoodScape.zip, its premium assets simply
-// overwrite these files — same filenames, same magic.
+// Paints the app icon, splash art and Android adaptive icon as PNGs in pure
+// Node (no dependencies), so a fresh clone runs in Expo Go with zero setup.
 
 const fs = require('fs');
 const path = require('path');
@@ -11,22 +9,9 @@ const zlib = require('zlib');
 const outDir = path.join(__dirname, '..', 'assets');
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-/* ------------------------------------------------------------------ */
-/* tiny seeded rng                                                     */
-/* ------------------------------------------------------------------ */
-function makeRng(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* PNG encoder (RGBA8)                                                 */
-/* ------------------------------------------------------------------ */
+/* ---------------------------------------------------------------- */
+/* minimal PNG encoder (RGBA8)                                       */
+/* ---------------------------------------------------------------- */
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -36,317 +21,200 @@ const CRC_TABLE = (() => {
   }
   return t;
 })();
+
 function crc32(buf) {
   let c = 0xffffffff;
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
-function pngChunk(type, data) {
-  const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+
+function chunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
   const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
   return Buffer.concat([len, body, crc]);
 }
-function encodePNG(width, height, rgba) {
+
+function encodePNG(w, h, rgba) {
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
   ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
-  const stride = width * 4 + 1;
-  const raw = Buffer.alloc(stride * height);
-  for (let y = 0; y < height; y++) {
+  const stride = w * 4 + 1;
+  const raw = Buffer.alloc(stride * h);
+  for (let y = 0; y < h; y++) {
     raw[y * stride] = 0;
-    rgba.copy(raw, y * stride + 1, y * width * 4, (y + 1) * width * 4);
+    rgba.copy(raw, y * stride + 1, y * w * 4, (y + 1) * w * 4);
   }
-  const idat = zlib.deflateSync(raw, { level: 9 });
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', idat),
-    pngChunk('IEND', Buffer.alloc(0)),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 
-/* ------------------------------------------------------------------ */
-/* framebuffer + shapes                                                */
-/* ------------------------------------------------------------------ */
-function hexRgb(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+/* ---------------------------------------------------------------- */
+/* painting helpers                                                  */
+/* ---------------------------------------------------------------- */
+const hex = (s) => [
+  parseInt(s.slice(1, 3), 16),
+  parseInt(s.slice(3, 5), 16),
+  parseInt(s.slice(5, 7), 16),
+];
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const mix = (a, b, t) => a + (b - a) * t;
+
+function makeCanvas(w, h) {
+  return { w, h, data: Buffer.alloc(w * h * 4) };
 }
-class Canvas {
-  constructor(w, h) {
-    this.w = w; this.h = h;
-    this.buf = Buffer.alloc(w * h * 4); // transparent
+
+// Source-over composite of color [r,g,b] with alpha a onto pixel i.
+function blend(canvas, x, y, rgb, a) {
+  if (x < 0 || y < 0 || x >= canvas.w || y >= canvas.h || a <= 0) return;
+  const i = (y * canvas.w + x) * 4;
+  const d = canvas.data;
+  const da = d[i + 3] / 255;
+  const outA = a + da * (1 - a);
+  if (outA <= 0) return;
+  for (let c = 0; c < 3; c++) {
+    d[i + c] = Math.round((rgb[c] * a + d[i + c] * da * (1 - a)) / outA);
   }
-  blend(x, y, r, g, b, a) {
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h || a <= 0) return;
-    const i = (y * this.w + x) * 4;
-    const da = this.buf[i + 3] / 255;
-    const oa = a + da * (1 - a);
-    if (oa <= 0) return;
-    this.buf[i]     = Math.round((r * a + this.buf[i] * da * (1 - a)) / oa);
-    this.buf[i + 1] = Math.round((g * a + this.buf[i + 1] * da * (1 - a)) / oa);
-    this.buf[i + 2] = Math.round((b * a + this.buf[i + 2] * da * (1 - a)) / oa);
-    this.buf[i + 3] = Math.round(oa * 255);
+  d[i + 3] = Math.round(outA * 255);
+}
+
+function fillVertical(canvas, top, bottom) {
+  for (let y = 0; y < canvas.h; y++) {
+    const t = y / (canvas.h - 1);
+    const rgb = [mix(top[0], bottom[0], t), mix(top[1], bottom[1], t), mix(top[2], bottom[2], t)];
+    for (let x = 0; x < canvas.w; x++) blend(canvas, x, y, rgb, 1);
   }
-  add(x, y, r, g, b, a) { // additive glow
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h || a <= 0) return;
-    const i = (y * this.w + x) * 4;
-    this.buf[i] = Math.min(255, this.buf[i] + r * a);
-    this.buf[i + 1] = Math.min(255, this.buf[i + 1] + g * a);
-    this.buf[i + 2] = Math.min(255, this.buf[i + 2] + b * a);
-    this.buf[i + 3] = Math.min(255, this.buf[i + 3] + 140 * a);
-  }
-  vGradient(stops) {
-    for (let y = 0; y < this.h; y++) {
-      const t = y / (this.h - 1);
-      let i = 0;
-      while (i < stops.length - 2 && stops[i + 1][0] <= t) i++;
-      const [t0, c0] = stops[i], [t1, c1] = stops[i + 1];
-      const k = Math.max(0, Math.min(1, (t - t0) / (t1 - t0 || 1)));
-      const [r0, g0, b0] = hexRgb(c0), [r1, g1, b1] = hexRgb(c1);
-      const r = r0 + (r1 - r0) * k, g = g0 + (g1 - g0) * k, b = b0 + (b1 - b0) * k;
-      for (let x = 0; x < this.w; x++) this.blend(x, y, r, g, b, 1);
+}
+
+function glow(canvas, cx, cy, r, rgb, alpha) {
+  const x0 = Math.max(0, Math.floor(cx - r));
+  const x1 = Math.min(canvas.w - 1, Math.ceil(cx + r));
+  const y0 = Math.max(0, Math.floor(cy - r));
+  const y1 = Math.min(canvas.h - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const d = Math.hypot(x - cx, y - cy) / r;
+      if (d >= 1) continue;
+      const fall = (1 - d) ** 2;
+      blend(canvas, x, y, rgb, alpha * fall);
     }
   }
-  ellipse(cx, cy, rx, ry, hex, alpha) {
-    const [r, g, b] = hexRgb(hex);
-    for (let y = Math.floor(cy - ry); y <= cy + ry; y++) {
-      for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
-        const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
-        if (d <= 1) this.blend(x, y, r, g, b, alpha);
-        else if (d <= 1.06) this.blend(x, y, r, g, b, alpha * (1.06 - d) / 0.06);
+}
+
+// The MoodScape orb: gradient glass sphere, sheen, rim light and a face.
+function orb(canvas, cx, cy, r, topColor, bottomColor, { face = true } = {}) {
+  const x0 = Math.max(0, Math.floor(cx - r) - 2);
+  const x1 = Math.min(canvas.w - 1, Math.ceil(cx + r) + 2);
+  const y0 = Math.max(0, Math.floor(cy - r) - 2);
+  const y1 = Math.min(canvas.h - 1, Math.ceil(cy + r) + 2);
+  const hx = cx - r * 0.34; // sheen centre
+  const hy = cy - r * 0.42;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const dist = Math.hypot(x - cx, y - cy);
+      const cov = clamp01(r - dist + 0.5); // 1px anti-aliased edge
+      if (cov <= 0) continue;
+      const t = clamp01((y - (cy - r)) / (2 * r));
+      let rgb = [
+        mix(topColor[0], bottomColor[0], t),
+        mix(topColor[1], bottomColor[1], t),
+        mix(topColor[2], bottomColor[2], t),
+      ];
+      // specular sheen (upper-left)
+      const hd = Math.hypot(x - hx, y - hy) / (r * 0.62);
+      if (hd < 1) {
+        const s = (1 - hd) ** 2 * 0.85;
+        rgb = rgb.map((v) => mix(v, 255, s));
       }
-    }
-  }
-  glow(cx, cy, radius, hex, strength) {
-    const [r, g, b] = hexRgb(hex);
-    for (let y = Math.floor(cy - radius); y <= cy + radius; y++) {
-      for (let x = Math.floor(cx - radius); x <= cx + radius; x++) {
-        const d = Math.hypot(x - cx, y - cy) / radius;
-        if (d < 1) this.add(x, y, r, g, b, strength * (1 - d) * (1 - d));
+      // rim light near the lower edge
+      const edge = dist / r;
+      if (edge > 0.82) {
+        const rim = ((edge - 0.82) / 0.18) ** 2 * (0.18 + 0.22 * t);
+        rgb = rgb.map((v) => mix(v, 255, rim));
       }
+      blend(canvas, x, y, rgb, cov);
     }
   }
-  poly(points, hex, alpha) {
-    const [r, g, b] = hexRgb(hex);
-    const ys = points.map((p) => p[1]);
-    const yMin = Math.floor(Math.min(...ys)), yMax = Math.ceil(Math.max(...ys));
-    for (let y = yMin; y <= yMax; y++) {
-      const xs = [];
-      for (let i = 0; i < points.length; i++) {
-        const [x1, y1] = points[i], [x2, y2] = points[(i + 1) % points.length];
-        if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
-          xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1));
-        }
-      }
-      xs.sort((a, b) => a - b);
-      for (let i = 0; i + 1 < xs.length; i += 2) {
-        for (let x = Math.floor(xs[i]); x <= Math.ceil(xs[i + 1]); x++) this.blend(x, y, r, g, b, alpha);
-      }
+  if (!face) return;
+  const ink = hex('#141830');
+  const eyeR = r * 0.075;
+  for (const s of [-1, 1]) {
+    glowSolid(canvas, cx + s * r * 0.30, cy - r * 0.05, eyeR, ink);
+  }
+  // smile: thick arc from the parametric curve
+  const mw = r * 0.62;
+  const my = cy + r * 0.30;
+  const lift = r * 0.16;
+  const thick = r * 0.055;
+  for (let i = 0; i <= 120; i++) {
+    const u = i / 120;
+    const px = cx - mw / 2 + mw * u;
+    const py = my + Math.sin(u * Math.PI) * lift;
+    glowSolid(canvas, px, py, thick, ink);
+  }
+}
+
+// filled anti-aliased dot
+function glowSolid(canvas, cx, cy, r, rgb) {
+  const x0 = Math.max(0, Math.floor(cx - r) - 1);
+  const x1 = Math.min(canvas.w - 1, Math.ceil(cx + r) + 1);
+  const y0 = Math.max(0, Math.floor(cy - r) - 1);
+  const y1 = Math.min(canvas.h - 1, Math.ceil(cy + r) + 1);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const cov = clamp01(r - Math.hypot(x - cx, y - cy) + 0.5);
+      if (cov > 0) blend(canvas, x, y, rgb, cov * 0.86);
     }
   }
-  line(x1, y1, x2, y2, w, hex, alpha) {
-    const [r, g, b] = hexRgb(hex);
-    const minX = Math.floor(Math.min(x1, x2) - w), maxX = Math.ceil(Math.max(x1, x2) + w);
-    const minY = Math.floor(Math.min(y1, y2) - w), maxY = Math.ceil(Math.max(y1, y2) + w);
-    const len2 = (x2 - x1) ** 2 + (y2 - y1) ** 2 || 1;
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        const t = Math.max(0, Math.min(1, ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / len2));
-        const d = Math.hypot(x - (x1 + t * (x2 - x1)), y - (y1 + t * (y2 - y1)));
-        if (d <= w) this.blend(x, y, r, g, b, alpha * (1 - d / (w + 1)));
-      }
-    }
-  }
-  downsample(factor) {
-    const w = this.w / factor, h = this.h / factor;
-    const out = new Canvas(w, h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let r = 0, g = 0, b = 0, a = 0;
-        for (let dy = 0; dy < factor; dy++) {
-          for (let dx = 0; dx < factor; dx++) {
-            const i = ((y * factor + dy) * this.w + x * factor + dx) * 4;
-            r += this.buf[i]; g += this.buf[i + 1]; b += this.buf[i + 2]; a += this.buf[i + 3];
-          }
-        }
-        const n = factor * factor, o = (y * w + x) * 4;
-        out.buf[o] = r / n; out.buf[o + 1] = g / n; out.buf[o + 2] = b / n; out.buf[o + 3] = a / n;
-      }
-    }
-    return out;
-  }
 }
 
-/* ------------------------------------------------------------------ */
-/* paint the MoodScape island                                          */
-/* ------------------------------------------------------------------ */
-function paintIsland(S, withSky) {
-  const W = 1024 * S, H = 1024 * S;
-  const c = new Canvas(W, H);
-  const rng = makeRng(20260718);
+/* ---------------------------------------------------------------- */
+/* compose the three assets                                          */
+/* ---------------------------------------------------------------- */
+const S = 1024;
 
-  if (withSky) {
-    c.vGradient([[0, '#141a44'], [0.42, '#4a3f8e'], [0.72, '#c06a9e'], [1, '#f7a8b8']]);
-    for (let i = 0; i < 46; i++) { // stars
-      const x = rng() * W, y = rng() * H * 0.5, r = (1 + rng() * 2.2) * S;
-      c.ellipse(x, y, r, r, '#ffffff', 0.35 + rng() * 0.5);
-    }
+function paintScene(canvas, { background }) {
+  const c = canvas.w / 2;
+  if (background) {
+    fillVertical(canvas, hex('#0A0F24'), hex('#1B2350'));
+    glow(canvas, c, c * 0.9, S * 0.62, hex('#6E8BFF'), 0.35);
+    glow(canvas, c * 1.5, c * 0.45, S * 0.30, hex('#A78BFA'), 0.30);
+    glow(canvas, c * 0.42, c * 1.55, S * 0.34, hex('#2BC8A5'), 0.22);
+  } else {
+    glow(canvas, c, c, S * 0.46, hex('#6E8BFF'), 0.5);
   }
-
-  const cx = W / 2, cy = H * 0.545;
-  c.glow(cx, cy - 30 * S, 400 * S, '#ffd9ec', withSky ? 0.4 : 0.55);
-  c.glow(cx, cy - 160 * S, 260 * S, '#c9a8ff', 0.35);
-
-  // crystal root
-  c.poly([[cx - 240 * S, cy + 55 * S], [cx, cy + 470 * S], [cx + 240 * S, cy + 55 * S]], '#8f7fd8', 0.85);
-  c.poly([[cx - 120 * S, cy + 62 * S], [cx, cy + 330 * S], [cx + 120 * S, cy + 62 * S]], '#bfaaff', 0.55);
-  c.line(cx, cy + 62 * S, cx, cy + 440 * S, 5 * S, '#ffffff', 0.35);
-
-  // waterfalls
-  for (let i = 0; i < 5; i++) {
-    const x = cx - (170 - i * 26) * S;
-    c.line(x, cy + 30 * S, x + 6 * S, cy + (300 + rng() * 60) * S, 7 * S, '#dff0ff', 0.75);
-  }
-
-  // glass platform
-  c.ellipse(cx, cy, 330 * S, 112 * S, '#e8d9ff', 0.95);
-  c.ellipse(cx, cy - 14 * S, 262 * S, 74 * S, '#ffffff', 0.4);
-  c.ellipse(cx, cy + 6 * S, 330 * S, 106 * S, '#9d8bd8', 0.25);
-
-  // crystal tree
-  c.glow(cx + 60 * S, cy - 300 * S, 240 * S, '#ffb8e6', 0.5);
-  c.line(cx + 66 * S, cy - 8 * S, cx + 44 * S, cy - 235 * S, 15 * S, '#efe0d8', 0.95);
-  const crown = ['#ffb8e6', '#c9a8ff', '#9fd8ff', '#ffd9ec'];
-  for (let i = 0; i < 9; i++) {
-    const a = rng() * Math.PI * 2, d = rng() * 120 * S;
-    c.ellipse(cx + 44 * S + Math.cos(a) * d, cy - 300 * S + Math.sin(a) * d * 0.7, (52 + rng() * 58) * S, (52 + rng() * 58) * S, crown[i % 4], 0.72);
-  }
-  c.ellipse(cx + 44 * S, cy - 300 * S, 60 * S, 60 * S, '#ffffff', 0.5);
-
-  // side crystals
-  c.poly([[cx - 250 * S, cy - 20 * S], [cx - 224 * S, cy - 120 * S], [cx - 198 * S, cy - 20 * S]], '#9fd8ff', 0.85);
-  c.poly([[cx + 218 * S, cy - 14 * S], [cx + 244 * S, cy - 96 * S], [cx + 270 * S, cy - 14 * S]], '#ffd9ec', 0.8);
-
-  // sparkles
-  for (let i = 0; i < 14; i++) {
-    const x = cx + (rng() - 0.5) * 640 * S, y = cy - rng() * 480 * S + 60 * S, l = (4 + rng() * 7) * S;
-    c.line(x - l, y, x + l, y, 1.6 * S, '#ffffff', 0.85);
-    c.line(x, y - l, x, y + l, 1.6 * S, '#ffffff', 0.85);
-  }
-  return c;
+  // companion orbs
+  orb(canvas, c * 1.52, c * 0.52, S * 0.085, hex('#FFE08A'), hex('#FF9E64'), { face: false });
+  orb(canvas, c * 0.44, c * 1.50, S * 0.065, hex('#7CF29C'), hex('#2BC8A5'), { face: false });
+  // the hero
+  orb(canvas, c, c, S * 0.30, hex('#8AD8FF'), hex('#6E8BFF'));
 }
 
-function savePNG(name, canvas) {
-  fs.writeFileSync(path.join(outDir, name), encodePNG(canvas.w, canvas.h, canvas.buf));
-  console.log(`[moodscape] painted ${name} (${canvas.w}x${canvas.h})`);
+function save(name, canvas) {
+  fs.writeFileSync(path.join(outDir, name), encodePNG(canvas.w, canvas.h, canvas.data));
+  console.log(`  painted assets/${name}`);
 }
 
-/* ------------------------------------------------------------------ */
-/* WAV synthesis                                                       */
-/* ------------------------------------------------------------------ */
-function writeWav(file, samples, sr) {
-  const n = samples.length;
-  const data = Buffer.alloc(n * 2);
-  for (let i = 0; i < n; i++) {
-    const v = Math.max(-1, Math.min(1, samples[i]));
-    data.writeInt16LE(Math.round(v * 32767), i * 2);
-  }
-  const hdr = Buffer.alloc(44);
-  hdr.write('RIFF', 0);
-  hdr.writeUInt32LE(36 + data.length, 4);
-  hdr.write('WAVE', 8); hdr.write('fmt ', 12);
-  hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22);
-  hdr.writeUInt32LE(sr, 24); hdr.writeUInt32LE(sr * 2, 28);
-  hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34);
-  hdr.write('data', 36); hdr.writeUInt32LE(data.length, 40);
-  fs.writeFileSync(file, Buffer.concat([hdr, data]));
-}
+console.log('MoodScape: painting Liquid Glass assets…');
 
-function synthAmbient() {
-  const sr = 44100, secs = 22, N = sr * secs;
-  const rng = makeRng(77);
-  const out = new Float32Array(N);
-  const chords = [
-    [146.83, 174.61, 220.0, 261.63, 329.63], // Dm9
-    [116.54, 146.83, 174.61, 220.0, 261.63], // Bb add
-  ];
-  for (const [ci, chord] of chords.entries()) {
-    for (const f of chord) {
-      const lfoF = 0.04 + rng() * 0.05, lfoP = rng() * 6.28, det = 0.35 + rng() * 0.4;
-      for (let i = 0; i < N; i++) {
-        const t = i / sr;
-        const xf = 0.5 + 0.5 * Math.tanh(Math.sin((t / secs) * Math.PI * 2 + ci * Math.PI) * 3);
-        if ((ci === 0 ? xf : 1 - xf) < 0.02) continue;
-        const lfo = 0.7 + 0.3 * Math.sin(6.283 * lfoF * t + lfoP);
-        const s = Math.sin(6.283 * f * t) + 0.35 * Math.sin(6.283 * (f + det) * t) + 0.12 * Math.sin(6.283 * f * 2 * t);
-        out[i] += s * lfo * (ci === 0 ? xf : 1 - xf) * 0.028;
-      }
-    }
-  }
-  // wind: filtered noise with slow swells
-  let y = 0;
-  for (let i = 0; i < N; i++) {
-    const t = i / sr;
-    y += 0.018 * ((rng() * 2 - 1) - y);
-    out[i] += y * (0.35 + 0.3 * Math.sin(6.283 * t / 11)) * 0.9;
-  }
-  // sparse glass chimes (pentatonic)
-  const notes = [880, 1046.5, 1174.7, 1318.5, 1568];
-  for (const start of [1.4, 5.1, 9.3, 13.9, 18.2]) {
-    const f = notes[Math.floor(rng() * notes.length)];
-    const s0 = Math.floor(start * sr);
-    for (let i = 0; i + s0 < N && i < sr * 3; i++) {
-      const t = i / sr;
-      const env = Math.exp(-t * 2.4);
-      out[s0 + i] += (Math.sin(6.283 * f * t) + 0.3 * Math.sin(6.283 * f * 2.76 * t) * Math.exp(-t * 3)) * env * 0.06;
-    }
-  }
-  // seamless 1.2s loop crossfade
-  const F = Math.floor(sr * 1.2);
-  for (let i = 0; i < F; i++) {
-    const k = i / F;
-    out[N - F + i] = out[N - F + i] * (1 - k) + out[i] * k;
-  }
-  // normalize
-  let peak = 0;
-  for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));
-  for (let i = 0; i < N; i++) out[i] = (out[i] / (peak || 1)) * 0.75;
-  writeWav(path.join(outDir, 'ambient.wav'), out, sr);
-  console.log('[moodscape] synthesized ambient.wav (22s loop)');
-}
+const icon = makeCanvas(S, S);
+paintScene(icon, { background: true });
+save('icon.png', icon);
 
-function synthChime() {
-  const sr = 44100, N = Math.floor(sr * 1.8);
-  const rng = makeRng(9);
-  const out = new Float32Array(N);
-  const f = 1318.5; // E6
-  for (let i = 0; i < N; i++) {
-    const t = i / sr;
-    let s = Math.sin(6.283 * f * t) * Math.exp(-t * 3.2)
-      + 0.4 * Math.sin(6.283 * f * 2.76 * t) * Math.exp(-t * 5.5)
-      + 0.15 * Math.sin(6.283 * f * 5.4 * t) * Math.exp(-t * 8);
-    if (t < 0.005) s += (rng() * 2 - 1) * 0.3 * (1 - t / 0.005); // strike
-    out[i] = s * 0.5;
-  }
-  writeWav(path.join(outDir, 'chime.wav'), out, sr);
-  console.log('[moodscape] synthesized chime.wav');
-}
+const splash = makeCanvas(S, S);
+paintScene(splash, { background: false });
+save('splash-icon.png', splash);
 
-/* ------------------------------------------------------------------ */
-const want = (n) => !fs.existsSync(path.join(outDir, n)) || fs.statSync(path.join(outDir, n)).size === 0;
+const adaptive = makeCanvas(S, S);
+glow(adaptive, S / 2, S / 2, S * 0.34, hex('#6E8BFF'), 0.5);
+orb(adaptive, S / 2, S / 2, S * 0.24, hex('#8AD8FF'), hex('#6E8BFF'));
+save('adaptive-icon.png', adaptive);
 
-if (want('icon.png')) {
-  savePNG('icon.png', paintIsland(2, true).downsample(2));
-}
-if (want('adaptive-icon.png')) {
-  savePNG('adaptive-icon.png', paintIsland(2, true).downsample(2));
-}
-if (want('splash-icon.png')) {
-  savePNG('splash-icon.png', paintIsland(1, false).downsample(1));
-}
-if (want('ambient.wav')) synthAmbient();
-if (want('chime.wav')) synthChime();
-
-console.log('[moodscape] assets ready');
+console.log('MoodScape: assets ready.');
