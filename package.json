@@ -1,0 +1,26 @@
+{
+  "name": "ember",
+  "version": "1.0.0",
+  "description": "Ember - a fire for your focus. Light it, focus while it burns, and every finished session becomes a firefly above your hearth.",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "^57.0.7",
+    "expo-haptics": "~57.0.1",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0"
+  },
+  "private": true
+}
