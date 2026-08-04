@@ -1,25 +1,31 @@
 {
   "expo": {
-    "name": "Ember",
-    "slug": "ember",
+    "name": "SnapNest",
+    "slug": "snapnest",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "ember",
-    "userInterfaceStyle": "dark",
+    "scheme": "snapnest",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "backgroundColor": "#0a0d18",
+    "backgroundColor": "#FBF7F1",
     "splash": {
-      "backgroundColor": "#0a0d18"
+      "backgroundColor": "#FBF7F1"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ember.hearth"
+      "bundleIdentifier": "com.snapnest.app"
     },
     "android": {
-      "package": "com.ember.hearth"
+      "package": "com.snapnest.app"
     },
     "plugins": [
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SnapNest only looks at the screenshots you choose. They never leave your phone."
+        }
+      ]
     ]
   }
 }

@@ -1,0 +1,165 @@
+// Six little screenshots that live inside the app, so SnapNest can show its
+// magic before you trust it with your own. Each one carries the text a real
+// screenshot would — and the Nest Brain reads it live, the same way it reads
+// anything you paste. Nothing here is pre-sorted; the Brain earns it.
+//
+// Pure data on purpose (no React imports): the node tests read this file too.
+
+export const SAMPLES = [
+  {
+    id: 'gig',
+    name: 'Concert tickets',
+    emoji: '🎸',
+    app: 'tickets',
+    tint: '#2E2440',
+    paper: '#3A2E52',
+    accent: '#FF9FBE',
+    inkOnTint: '#F6EFFF',
+    text: [
+      'LUNA WAVES',
+      'UK Tour 2026',
+      'The Brighton Dome',
+      '18 August · Doors 7pm',
+      'Tickets from £32.50',
+      'Presale opens Friday 10am',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'img', h: 54, label: '🎤' },
+      { k: 'title', text: 'LUNA WAVES' },
+      { k: 'line', text: 'UK Tour 2026 · The Brighton Dome' },
+      { k: 'tag', text: '18 August · Doors 7pm' },
+      { k: 'btn', text: 'Tickets from £32.50' },
+    ],
+  },
+  {
+    id: 'trainers',
+    name: 'Pink trainers',
+    emoji: '👟',
+    app: 'shop',
+    tint: '#FFF3F7',
+    paper: '#FFFFFF',
+    accent: '#E4577E',
+    inkOnTint: '#4A3A50',
+    text: [
+      'Cloudstep Trainers — Blush Pink',
+      '£54.99',
+      'Was £66.99',
+      'Size 5 · Free returns',
+      'Add to bag',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'img', h: 64, label: '👟' },
+      { k: 'title', text: 'Cloudstep Trainers' },
+      { k: 'line', text: 'Blush Pink · Size 5 · Free returns' },
+      { k: 'price', text: '£54.99', was: '£66.99' },
+      { k: 'btn', text: 'Add to bag' },
+    ],
+  },
+  {
+    id: 'pasta',
+    name: 'Lemon pasta recipe',
+    emoji: '🍝',
+    app: 'recipes',
+    tint: '#FFF8E7',
+    paper: '#FFFDF4',
+    accent: '#D79A1E',
+    inkOnTint: '#4E4022',
+    text: [
+      'One-Pan Lemon Pasta',
+      '25 minutes · Serves 2',
+      'Ingredients',
+      '200g spaghetti',
+      '1 lemon',
+      '60g parmesan',
+      '100ml double cream',
+      'Method: simmer, toss, twirl',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'img', h: 48, label: '🍝' },
+      { k: 'title', text: 'One-Pan Lemon Pasta' },
+      { k: 'tag', text: '25 minutes · Serves 2' },
+      { k: 'line', text: '200g spaghetti · 1 lemon' },
+      { k: 'line', text: '60g parmesan · double cream' },
+    ],
+  },
+  {
+    id: 'job',
+    name: 'Design job advert',
+    emoji: '💼',
+    app: 'jobs',
+    tint: '#EAF2FE',
+    paper: '#FFFFFF',
+    accent: '#3568AD',
+    inkOnTint: '#33415C',
+    text: [
+      'Junior Graphic Designer',
+      'Crawley · Hybrid',
+      '£26,000 – £30,000',
+      'Portfolio required',
+      'Apply by 22 August',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'title', text: 'Junior Graphic Designer' },
+      { k: 'line', text: 'Crawley · Hybrid' },
+      { k: 'tag', text: '£26,000 – £30,000' },
+      { k: 'line', text: 'Portfolio required' },
+      { k: 'btn', text: 'Apply by 22 August' },
+    ],
+  },
+  {
+    id: 'sophie',
+    name: 'Sophie’s message',
+    emoji: '🥐',
+    app: 'chat',
+    tint: '#EFF6EF',
+    paper: '#FFFFFF',
+    accent: '#4E9B6F',
+    inkOnTint: '#3C4A3F',
+    text: [
+      'Sophie 💬',
+      'are we still on for brunch sunday??',
+      'found the cutest place near the station',
+      'sent 9:41',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'title', text: 'Sophie' },
+      { k: 'bubble', text: 'are we still on for brunch sunday?? 🥐' },
+      { k: 'bubble', text: 'found the cutest place near the station' },
+      { k: 'bubble', text: 'omg yes — which one?', mine: true },
+    ],
+  },
+  {
+    id: 'lisbon',
+    name: 'Lisbon city break',
+    emoji: '🇵🇹',
+    app: 'travel',
+    tint: '#E8F6F7',
+    paper: '#FFFFFF',
+    accent: '#28808A',
+    inkOnTint: '#2F4C50',
+    text: [
+      'Lisbon getaway',
+      '3 nights · from £189pp',
+      'Alfama old town + Tram 28',
+      'Save for later',
+    ].join('\n'),
+    layout: [
+      { k: 'chrome' },
+      { k: 'img', h: 58, label: '🌇' },
+      { k: 'title', text: 'Lisbon getaway' },
+      { k: 'line', text: 'Alfama old town + Tram 28' },
+      { k: 'price', text: 'from £189pp' },
+      { k: 'btn', text: 'Save for later' },
+    ],
+  },
+];
+
+export const SAMPLE_BY_ID = Object.fromEntries(SAMPLES.map((s) => [s.id, s]));
+
+// The five that fly into folders during onboarding's "first result" moment.
+export const FIRST_NEST_IDS = ['gig', 'trainers', 'pasta', 'job', 'sophie'];

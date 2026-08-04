@@ -1,5 +1,5 @@
-// Deterministic seeded randomness — every firefly drifts on its own path,
-// seeded by its own session, so the clearing looks alive but never random twice.
+// Deterministic seeded randomness — sample screenshots, confetti and mascot
+// fidgets are all seeded, so the nest feels alive but never rearranges itself.
 
 export function hashString(str) {
   let h = 2166136261;
