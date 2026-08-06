@@ -1,11 +1,11 @@
-# Ember 🔥
+# Summit ⛰
 
-**A fire for your focus.** Light a campfire, and it burns while you work.
-Finish the session, and it becomes a **firefly** that lives in your clearing
-forever. Show up every day, and the stone ring around your hearth grows.
+**The long climb of your credit.** Log your score whenever you check it, and
+Summit charts the trail behind you and forecasts the route ahead — *is it going
+up, by how much, and when* — with the reasoning laid out in plain words.
 
 Built with **Expo SDK 57** — runs entirely inside **Expo Go**. No accounts, no cloud:
-your whole clearing lives on your device.
+your whole climb lives on your device. Summit never connects to your credit report.
 
 ---
 
@@ -21,7 +21,7 @@ npm install
 npx expo start
 ```
 
-Then scan the QR code with **Expo Go** and pull up a log. 🔥
+Then scan the QR code with **Expo Go** and start climbing. ⛰
 
 > If your PC and phone are on different networks, use `npx expo start --tunnel`.
 
@@ -29,25 +29,48 @@ Then scan the QR code with **Expo Go** and pull up a log. 🔥
 
 ## How it works
 
-- **Light the fire** — pick 10, 25, or 50 minutes and light it. Three tongues of
-  flame flicker over the logs, sparks rise, and warm light spills across the
-  clearing while you focus.
-- **An honest countdown** — the timer is anchored to wall-clock time, so
-  backgrounding the app never gives you free minutes.
-- **Fireflies, not checkmarks** — every finished session becomes a firefly
-  drifting above the trees on its own seeded path. Longer sessions glow bigger.
-  Up to sixty of your most recent sessions light the clearing at once.
-- **The stone ring** — light a fire on consecutive days and stones are added
-  around the hearth, up to a full ring. Tap the 🔥 streak chip to see everything
-  the hearth remembers: fireflies, total focus time, today's minutes, streak.
-- **Let it go out** — quitting early just lets the flame die down. No shame,
-  no lost fireflies. Tomorrow the logs are dry again.
-- **Gentle by design** — honors your system Reduce Motion setting.
+- **The altimeter** — your latest score on the 300–850 dial, its band
+  (Poor → Excellent), and how far you've climbed since the last reading.
+- **The ascent** — a chart of every score you've logged, then a dashed
+  *estimated route* for the next twelve months inside a widening
+  *likely range* cone. Your checkpoint (goal score) sits on the chart as a
+  gold line, with an ETA when the route crosses it.
+- **The route report** — the headline answer ("Climbing — likely +6–31 pts by
+  November"), the next-3-months and next-12-months ranges, and the *why*:
+  every force the forecast sees, in plain words.
+- **Waypoints** — gains with dates already on the calendar: a hard inquiry
+  stops counting about a year after it happened, new-account drag lifts near
+  six months, late marks fade at one and two years and fall off near seven.
+  Each waypoint shows its month and its estimated lift.
+- **Levers** — gains that wait on a choice instead of a date, listed
+  separately: paying utilization below 30% (or under 10%) usually shows up
+  within a statement cycle or two. The forecast itself never assumes you pull
+  them.
+- **What my report knows** — tell Summit your card utilization, hard
+  inquiries, new accounts, and late marks (month precision — exactly as
+  precise as a credit report gets), set a checkpoint score, and manage your
+  trail log. The more it knows, the sharper the route.
+
+## How the forecast is built — and what it isn't
+
+Summit blends the **trend of your own logged scores** (weighted toward recent
+readings, decaying with distance — momentum isn't a promise) with
+**widely-published scoring patterns that have predictable timing** (inquiry
+and late-mark aging, new-credit drag, the slow lift of a clean paying file).
+Drift is re-computed for every projected month, so a dent that ages out
+mid-forecast stops muting the climb from that month on.
+
+The real scoring formulas are proprietary. That's why every number in Summit
+is a **range**, the range **widens with distance**, and the app says so on its
+face. It is an estimate to plan around — not your bureau's math, and not
+financial advice. Your actual reports are free at
+[annualcreditreport.com](https://www.annualcreditreport.com).
 
 ## Lineage
 
-Ember is the third life of this repository (after MoodScape, whose spirit lives
-on in [Constella](https://github.com/rebecca002123/Expo-app)). It keeps the
-family's DNA — a living, procedural night scene; everything stored on-device;
-seeded randomness so your world never rearranges — and turns it toward focus:
-instead of logging how you felt, you feed a fire with your attention.
+Summit is the fourth life of this repository (after MoodScape, whose spirit
+lives on in [Constella](https://github.com/rebecca002123/Expo-app), and
+Ember). It keeps the family's DNA — a living night scene, everything stored
+on-device, seeded randomness so your mountain never rearranges itself — and
+turns it toward the longest climb most of us are on: the slow, patient one
+toward a better score.

@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Ember",
-    "slug": "ember",
+    "name": "Summit",
+    "slug": "summit",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "ember",
+    "scheme": "summit",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "backgroundColor": "#0a0d18",
+    "backgroundColor": "#05070f",
     "splash": {
-      "backgroundColor": "#0a0d18"
+      "backgroundColor": "#05070f"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ember.hearth"
+      "bundleIdentifier": "com.summit.climb"
     },
     "android": {
-      "package": "com.ember.hearth"
+      "package": "com.summit.climb"
     },
     "plugins": [
       "expo-status-bar"

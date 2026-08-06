@@ -1,7 +1,7 @@
 {
-  "name": "ember",
+  "name": "summit",
   "version": "1.0.0",
-  "description": "Ember - a fire for your focus. Light it, focus while it burns, and every finished session becomes a firefly above your hearth.",
+  "description": "Summit - the long climb of your credit. Track the score you log, and see when it should rise, and why.",
   "main": "index.js",
   "scripts": {
     "start": "expo start",

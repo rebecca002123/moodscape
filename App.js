@@ -1,16 +1,16 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { HearthProvider } from './src/state/HearthStore';
-import HearthScreen from './src/screens/HearthScreen';
+import { ScoreProvider } from './src/state/ScoreStore';
+import SummitScreen from './src/screens/SummitScreen';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <HearthProvider>
-        <StatusBar hidden />
-        <HearthScreen />
-      </HearthProvider>
+      <ScoreProvider>
+        <StatusBar style="light" />
+        <SummitScreen />
+      </ScoreProvider>
     </SafeAreaProvider>
   );
 }
