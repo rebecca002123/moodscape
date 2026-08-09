@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#05070f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ember" />
+<title>Ember</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --night-0: #05070f;
+    --night-1: #0b1224;
+    --night-2: #152036;
+    --night-3: #1d2a40;
+    --cream: #ffe9c8;
+    --cream-60: rgba(255, 233, 200, 0.6);
+    --cream-50: rgba(255, 233, 200, 0.5);
+    --cream-45: rgba(255, 233, 200, 0.45);
+    --flame: #ff8c3b;
+    --flame-warm: #ffd9a0;
+    --glow: #ff9d4d;
+    --ink: #1c1206;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    background: var(--night-0);
+    color: var(--cream);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #scene {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg, var(--night-0) 0%, var(--night-1) 33%, var(--night-2) 66%, var(--night-3) 100%);
+  }
+
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* Warm light spilling from the fire across the clearing. */
+  #glow {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: 150vmax;
+    height: 150vmax;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 157, 77, 0.32) 0%, rgba(255, 157, 77, 0.10) 38%, transparent 68%);
+    opacity: 0;
+    transition: opacity 2s ease-out;
+    pointer-events: none;
+  }
+  body.burning #glow { opacity: 1; transition-duration: 1.2s; }
+
+  header {
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    top: calc(env(safe-area-inset-top, 0px) + 14px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: 1px; }
+  .subtitle { color: var(--cream-50); font-size: 13px; margin-top: 2px; }
+
+  #streakChip {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 157, 77, 0.3);
+    border-radius: 18px;
+    padding: 8px 14px;
+    color: var(--flame-warm);
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  #fireArea {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: max(170px, calc(env(safe-area-inset-bottom, 0px) + 170px));
+    pointer-events: none;
+  }
+  #campfire { position: relative; width: 240px; height: 220px; }
+
+  #flame {
+    position: absolute;
+    bottom: 58px;
+    left: 60px;
+    opacity: 0;
+    transition: opacity 1.6s ease-out;
+    transform-origin: 50% 100%;
+  }
+  body.burning #flame { opacity: 1; transition-duration: 0.9s; }
+  body.burning:not(.reduce-motion) #flame { animation: flicker 0.82s ease-in-out infinite; }
+  @keyframes flicker {
+    0%   { transform: scale(1, 1); }
+    32%  { transform: scale(1.045, 0.92); }
+    71%  { transform: scale(0.965, 1.05); }
+    100% { transform: scale(1, 1); }
+  }
+
+  .spark {
+    position: absolute;
+    bottom: 70px;
+    width: 4px;
+    height: 4px;
+    border-radius: 2px;
+    background: #ffcf7d;
+    opacity: 0;
+  }
+  body.burning:not(.reduce-motion) .spark { animation: spark-rise 1.6s ease-out infinite; }
+  @keyframes spark-rise {
+    0%   { opacity: 0; transform: translate(0, 0); }
+    15%  { opacity: 1; }
+    50%  { transform: translate(6px, -45px); }
+    100% { opacity: 0; transform: translate(-4px, -90px); }
+  }
+
+  #controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .panel { display: none; flex-direction: column; align-items: center; }
+  body.idle #panel-idle, body.burning #panel-burning, body.done #panel-done { display: flex; }
+
+  #durations { display: flex; gap: 10px; margin-bottom: 14px; }
+  .duration {
+    padding: 8px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 233, 200, 0.2);
+    background: transparent;
+    color: var(--cream-60);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .duration.active {
+    background: rgba(255, 140, 59, 0.2);
+    border-color: var(--flame);
+    color: var(--flame-warm);
+    font-weight: 700;
+  }
+
+  #lightBtn {
+    background: var(--flame);
+    border: none;
+    border-radius: 22px;
+    padding: 14px 30px;
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #lightBtn:active { transform: scale(0.97); }
+
+  #timer {
+    font-size: 52px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  #burningHint { color: var(--cream-50); font-size: 14px; margin-top: 4px; }
+
+  #extinguishBtn {
+    margin-top: 14px;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: var(--cream-45);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  #panel-done { padding: 20px 0; }
+  .done-text { font-size: 20px; font-weight: 700; }
+  .done-sub { color: var(--cream-60); font-size: 14px; margin-top: 6px; }
+
+  /* The hearth's ledger. */
+  #statsBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 12, 0.78);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  #statsBackdrop.open { display: flex; }
+  #statsBackdrop.visible { opacity: 1; }
+  #statsPanel {
+    background: rgba(22, 26, 44, 0.97);
+    border: 1px solid rgba(255, 157, 77, 0.25);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 340px;
+    width: 100%;
+  }
+  #statsPanel h2 { font-size: 20px; font-weight: 700; margin-bottom: 18px; }
+  #statsGrid { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .stat {
+    width: 110px;
+    padding: 14px 0;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .stat b { color: var(--flame-warm); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat span { color: rgba(255, 233, 200, 0.55); font-size: 12px; margin-top: 4px; }
+  #statsNote { color: var(--cream-50); font-size: 13px; font-style: italic; margin-top: 18px; text-align: center; }
+  #closeStats {
+    margin-top: 20px;
+    background: rgba(255, 140, 59, 0.9);
+    border: none;
+    border-radius: 16px;
+    padding: 10px 20px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  button:focus-visible { outline: 2px solid var(--flame-warm); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #flame, .spark { animation: none !important; }
+  }
+</style>
+</head>
+<body class="idle">
+<div id="scene">
+  <canvas id="backdrop"></canvas>
+  <div id="glow"></div>
+  <canvas id="fireflies"></canvas>
+</div>
+
+<header>
+  <div>
+    <h1>Ember</h1>
+    <div class="subtitle">a fire for your focus</div>
+  </div>
+  <button id="streakChip" aria-label="Open hearth stats">🔥 <span id="streakCount">0</span></button>
+</header>
+
+<div id="fireArea">
+  <div id="campfire">
+    <!-- The flame — three tongues of fire, scaling from the base. -->
+    <svg id="flame" width="120" height="130" viewBox="0 0 120 130" aria-hidden="true">
+      <path d="M60 6 C78 40 100 56 96 88 C93 114 78 126 60 126 C42 126 27 114 24 88 C20 56 42 40 60 6 Z" fill="#ff8c3b" opacity="0.85"/>
+      <path d="M60 34 C71 56 85 66 82 90 C80 108 71 118 60 118 C49 118 40 108 38 90 C35 66 49 56 60 34 Z" fill="#ffb85c"/>
+      <path d="M60 62 C66 74 73 80 71 94 C70 106 65 112 60 112 C55 112 50 106 49 94 C47 80 54 74 60 62 Z" fill="#ffe9a8"/>
+    </svg>
+
+    <!-- Logs, embers, and the stone ring that grows with your streak. -->
+    <svg id="hearth" width="240" height="90" viewBox="0 0 240 90" style="position:absolute;bottom:0" aria-hidden="true">
+      <ellipse cx="120" cy="72" rx="86" ry="14" fill="#000000" opacity="0.35"/>
+      <rect x="62" y="44" width="116" height="16" rx="8" fill="#5b3a24" transform="rotate(12 120 52)"/>
+      <rect x="62" y="44" width="116" height="16" rx="8" fill="#6b452b" transform="rotate(-12 120 52)"/>
+      <circle id="ember1" cx="112" cy="56" r="5" fill="#b0542a" opacity="0.9"/>
+      <circle id="ember2" cx="128" cy="60" r="4" fill="#8a4020" opacity="0.9"/>
+      <g id="stones"></g>
+    </svg>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="panel" id="panel-idle">
+    <div id="durations" role="radiogroup" aria-label="Session length"></div>
+    <button id="lightBtn">Light the fire</button>
+  </div>
+
+  <div class="panel" id="panel-burning">
+    <div id="timer">25:00</div>
+    <div id="burningHint">The fire is holding your focus.</div>
+    <button id="extinguishBtn">Let it go out</button>
+  </div>
+
+  <div class="panel" id="panel-done">
+    <div class="done-text">The fire settles.</div>
+    <div class="done-sub">A firefly rises into the clearing. ✦</div>
+  </div>
+</div>
+
+<div id="statsBackdrop">
+  <div id="statsPanel" role="dialog" aria-modal="true" aria-label="The hearth remembers">
+    <h2>The hearth remembers</h2>
+    <div id="statsGrid"></div>
+    <div id="statsNote"></div>
+    <button id="closeStats">Back to the fire</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---- Deterministic seeded randomness (same as the native app) ----
+function hashString(str) {
+  let h = 2166136261;
+  const s = String(str);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeRng(seedKey) {
+  const next = mulberry32(hashString(seedKey));
+  return {
+    next,
+    range: (min, max) => min + next() * (max - min),
+    chance: (p) => next() < p,
+  };
+}
+
+// ---- The hearth's memory: every finished session, stored on this device ----
+const SESSIONS_KEY = 'ember.sessions.v1';
+const MAX_VISIBLE_FIREFLIES = 60;
+
+function loadSessions() {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    return raw === null ? [] : JSON.parse(raw);
+  } catch { return []; }
+}
+function saveSessions(list) {
+  try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(list)); } catch {}
+}
+function dayStart(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+function computeStreak(sessions, now = Date.now()) {
+  if (!sessions.length) return 0;
+  const days = new Set(sessions.map((s) => dayStart(s.endedAt)));
+  const dayMs = 24 * 60 * 60 * 1000;
+  // A streak counts back from today — or from yesterday, so it isn't
+  // broken just because tonight's fire hasn't been lit yet.
+  let cursor = dayStart(now);
+  if (!days.has(cursor)) cursor -= dayMs;
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak++;
+    cursor -= dayMs;
+  }
+  return streak;
+}
+
+let sessions = loadSessions();
+
+// ---- Reduce Motion ----
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let reduceMotion = motionQuery.matches;
+function applyMotionPref() {
+  reduceMotion = motionQuery.matches;
+  document.body.classList.toggle('reduce-motion', reduceMotion);
+  drawFirefliesStatic();
+}
+motionQuery.addEventListener?.('change', applyMotionPref);
+
+// ---- Backdrop: night sky, stars, pines ----
+const backdrop = document.getElementById('backdrop');
+function drawBackdrop() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  backdrop.width = w * dpr;
+  backdrop.height = h * dpr;
+  const ctx = backdrop.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const starRng = makeRng('ember-stars');
+  ctx.fillStyle = '#e8eeff';
+  for (let i = 0; i < 46; i++) {
+    const x = starRng.range(0, w);
+    const y = starRng.range(0, h * 0.5);
+    const size = starRng.range(1, 2.4);
+    ctx.globalAlpha = starRng.range(0.2, 0.7);
+    ctx.beginPath();
+    ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Three stacked triangles make a pine.
+  const treeRng = makeRng('ember-trees');
+  const baseY = h * 0.82;
+  let x = -20;
+  while (x < w + 40) {
+    const th = treeRng.range(h * 0.16, h * 0.3);
+    const tw = th * 0.62;
+    const flip = treeRng.chance(0.5);
+    ctx.fillStyle = flip ? '#080d18' : '#0a1020';
+    for (const offset of [0.0, 0.28, 0.52]) {
+      const top = baseY - th + th * offset;
+      const lw = tw * (0.55 + offset);
+      const bottom = top + th * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x - lw / 2, bottom);
+      ctx.lineTo(x + lw / 2, bottom);
+      ctx.closePath();
+      ctx.fill();
+    }
+    x += treeRng.range(46, 90);
+  }
+}
+
+// ---- Fireflies: one per finished session, drifting on seeded paths ----
+const fireflyCanvas = document.getElementById('fireflies');
+let fireflies = [];
+let fireflyRaf = null;
+
+function buildFireflies() {
+  const w = window.innerWidth, h = window.innerHeight * 0.9;
+  fireflies = sessions.slice(-MAX_VISIBLE_FIREFLIES).map((s) => {
+    const rng = makeRng(s.id);
+    return {
+      x: rng.range(w * 0.08, w * 0.92),
+      y: rng.range(h * 0.08, h * 0.52),
+      size: 3 + Math.min(s.minutes / 12, 4),
+      driftX: rng.range(8, 26) * (rng.chance(0.5) ? 1 : -1),
+      driftY: rng.range(6, 18),
+      period: rng.range(3200, 6400),
+      phase: rng.range(0, Math.PI * 2),
+    };
+  });
+}
+
+function fireflyCtx() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  if (fireflyCanvas.width !== w * dpr || fireflyCanvas.height !== h * dpr) {
+    fireflyCanvas.width = w * dpr;
+    fireflyCanvas.height = h * dpr;
+  }
+  const ctx = fireflyCanvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+
+function drawFireflyFrame(now) {
+  const ctx = fireflyCtx();
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  for (const f of fireflies) {
+    // t breathes 0→1→0; position drifts, glow brightens at mid-swing.
+    const t = reduceMotion ? 0 : 0.5 - 0.5 * Math.cos((now / f.period) * Math.PI + f.phase);
+    const x = f.x + f.driftX * t;
+    const y = f.y + f.driftY * t;
+    const alpha = 0.35 + 0.65 * (1 - Math.abs(t - 0.5) * 2);
+    const s = f.size;
+    ctx.globalAlpha = alpha * 0.18;
+    ctx.fillStyle = '#d8ff9d';
+    ctx.beginPath();
+    ctx.arc(x, y, s * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#eaffb0';
+    ctx.beginPath();
+    ctx.arc(x, y, s / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFirefliesStatic() { drawFireflyFrame(0); }
+
+function animateFireflies() {
+  if (fireflyRaf) cancelAnimationFrame(fireflyRaf);
+  const loop = (now) => {
+    drawFireflyFrame(now);
+    if (!reduceMotion) fireflyRaf = requestAnimationFrame(loop);
+  };
+  fireflyRaf = requestAnimationFrame(loop);
+}
+
+// ---- The stone ring grows with your streak ----
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function drawStones(streak) {
+  const g = document.getElementById('stones');
+  g.innerHTML = '';
+  const stones = Math.min(2 + streak, 10);
+  for (let i = 0; i < stones; i++) {
+    const angle = Math.PI * (0.08 + (i / Math.max(stones - 1, 1)) * 0.84);
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', 120 + Math.cos(angle) * 92);
+    c.setAttribute('cy', 74 - Math.sin(angle) * 16);
+    c.setAttribute('r', 9);
+    c.setAttribute('fill', '#3a4254');
+    g.appendChild(c);
+  }
+}
+
+// ---- Sparks ----
+const campfire = document.getElementById('campfire');
+for (let i = 0; i < 5; i++) {
+  const spark = document.createElement('div');
+  spark.className = 'spark';
+  spark.style.left = (108 + (i % 3) * 12) + 'px';
+  spark.style.animationDelay = (i * 0.42) + 's';
+  campfire.appendChild(spark);
+}
+
+// ---- UI state ----
+const DURATIONS = [10, 25, 50];
+let phase = 'idle'; // idle | burning | done
+let minutes = 25;
+let endsAt = null;
+let tickInterval = null;
+let doneTimer = null;
+let wakeLock = null;
+
+const timerEl = document.getElementById('timer');
+const streakCountEl = document.getElementById('streakCount');
+const ember1 = document.getElementById('ember1');
+const ember2 = document.getElementById('ember2');
+
+function vibrate(pattern) {
+  try { navigator.vibrate?.(pattern); } catch {}
+}
+
+async function acquireWakeLock() {
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+}
+function releaseWakeLock() {
+  try { wakeLock?.release(); } catch {}
+  wakeLock = null;
+}
+
+function formatTime(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function setPhase(next) {
+  phase = next;
+  document.body.classList.remove('idle', 'burning', 'done');
+  document.body.classList.add(next);
+  const burning = next === 'burning';
+  ember1.setAttribute('fill', burning ? '#ff9d4d' : '#b0542a');
+  ember2.setAttribute('fill', burning ? '#ffcf7d' : '#8a4020');
+  if (!burning) {
+    document.title = 'Ember';
+    releaseWakeLock();
+  }
+}
+
+function refreshHearth() {
+  const streak = computeStreak(sessions);
+  streakCountEl.textContent = streak;
+  drawStones(streak);
+}
+
+// The countdown is anchored to a wall-clock end time, so leaving the page
+// in the background never loses a second of the fire's honesty.
+function tick() {
+  if (phase !== 'burning') return;
+  const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+  timerEl.textContent = formatTime(left);
+  document.title = '🔥 ' + formatTime(left) + ' · Ember';
+  if (left === 0) {
+    clearInterval(tickInterval);
+    vibrate([30, 60, 30]);
+    sessions = [...sessions, {
+      id: 'fire-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
+      endedAt: Date.now(),
+      minutes,
+    }];
+    saveSessions(sessions);
+    refreshHearth();
+    buildFireflies();
+    if (reduceMotion) drawFirefliesStatic();
+    setPhase('done');
+    doneTimer = setTimeout(() => setPhase('idle'), 4000);
+  }
+}
+
+function light() {
+  vibrate(20);
+  endsAt = Date.now() + minutes * 60 * 1000;
+  timerEl.textContent = formatTime(minutes * 60);
+  setPhase('burning');
+  acquireWakeLock();
+  clearInterval(tickInterval);
+  tickInterval = setInterval(tick, 500);
+}
+
+function extinguish() {
+  vibrate(10);
+  clearInterval(tickInterval);
+  setPhase('idle');
+}
+
+document.getElementById('lightBtn').addEventListener('click', light);
+document.getElementById('extinguishBtn').addEventListener('click', extinguish);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (phase === 'burning') {
+    tick();
+    acquireWakeLock();
+  }
+  if (!reduceMotion) animateFireflies();
+});
+
+// ---- Duration chips ----
+const durationsEl = document.getElementById('durations');
+for (const d of DURATIONS) {
+  const btn = document.createElement('button');
+  btn.className = 'duration' + (d === minutes ? ' active' : '');
+  btn.textContent = d + ' min';
+  btn.setAttribute('role', 'radio');
+  btn.addEventListener('click', () => {
+    minutes = d;
+    durationsEl.querySelectorAll('.duration').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  durationsEl.appendChild(btn);
+}
+
+// ---- Stats modal ----
+const statsBackdrop = document.getElementById('statsBackdrop');
+function openStats() {
+  const streak = computeStreak(sessions);
+  const totalMinutes = sessions.reduce((sum, s) => sum + s.minutes, 0);
+  const todayMinutes = sessions
+    .filter((s) => dayStart(s.endedAt) === dayStart(Date.now()))
+    .reduce((sum, s) => sum + s.minutes, 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  const stats = [
+    [sessions.length, sessions.length === 1 ? 'firefly' : 'fireflies'],
+    [hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm', 'total focus'],
+    [todayMinutes + 'm', 'today'],
+    [streak, 'day streak'],
+  ];
+  document.getElementById('statsGrid').innerHTML = stats
+    .map(([v, l]) => '<div class="stat"><b>' + v + '</b><span>' + l + '</span></div>')
+    .join('');
+  document.getElementById('statsNote').textContent = streak >= 3
+    ? 'The stone ring is growing. Keep the fire fed.'
+    : 'Light a fire each day and the stone ring grows.';
+  statsBackdrop.classList.add('open');
+  requestAnimationFrame(() => statsBackdrop.classList.add('visible'));
+}
+function closeStats() {
+  statsBackdrop.classList.remove('visible');
+  setTimeout(() => statsBackdrop.classList.remove('open'), 250);
+}
+document.getElementById('streakChip').addEventListener('click', openStats);
+document.getElementById('closeStats').addEventListener('click', closeStats);
+statsBackdrop.addEventListener('click', (e) => { if (e.target === statsBackdrop) closeStats(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeStats(); });
+
+// ---- Boot ----
+function layout() {
+  drawBackdrop();
+  buildFireflies();
+  if (reduceMotion) drawFirefliesStatic();
+}
+window.addEventListener('resize', layout);
+layout();
+applyMotionPref();
+refreshHearth();
+if (!reduceMotion) animateFireflies();
+</script>
+</body>
+</html>

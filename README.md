@@ -9,7 +9,20 @@ your whole clearing lives on your device.
 
 ---
 
-## Run it
+## Use it on your phone — no PC, no Expo
+
+[`web/index.html`](web/index.html) is the whole app as a single web page: same
+fire, same fireflies, same streak, saved on your device with no account. Open it
+in any browser and it just runs — no Node, no Expo, no install.
+
+To make it feel like a real app, host the file anywhere (GitHub Pages, Netlify
+Drop, any static host — it's one self-contained file), open the link on your
+phone, and choose **Add to Home Screen**. It gets its own icon and opens
+full-screen like a native app.
+
+---
+
+## Run the native version (Expo)
 
 You need [Node.js](https://nodejs.org) and the **Expo Go** app on your phone
 (iOS / Android — make sure it's up to date).
